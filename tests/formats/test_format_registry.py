@@ -12,7 +12,14 @@ from django_outbound_webhooks.types.format_id import FormatId
 from django_outbound_webhooks.types.rendered_body import RenderedBody
 
 
-class _Stub(BodyFormat):
+class _Stub:
+    """A conforming format that inherits nothing.
+
+    Deliberately not a subclass of ``BodyFormat``. The protocol is structural, so
+    an operator's own format never has to import anything from this package, and
+    a stub that inherited would be testing a coupling the design does not have.
+    """
+
     def __init__(self, name: str, version: int) -> None:
         self.name = name
         self.version = version
@@ -123,3 +130,102 @@ def test_the_app_publishes_the_built_in_envelope() -> None:
     # app config stopped registering, every delivery would fail closed rather
     # than silently pick a format, and this is what says so.
     assert FormatId(name="envelope", version=1) in formats.published()
+
+
+def test_an_object_inheriting_nothing_is_accepted(registry: FormatRegistry) -> None:
+    # The point of the protocol. _Stub imports RenderedBody because it returns
+    # one, and nothing else from this package.
+    assert isinstance(_Stub("envelope", 1), BodyFormat)
+    registry.register(_Stub("envelope", 1))
+
+
+def test_inheriting_the_protocol_still_refuses_a_missing_render() -> None:
+    # A protocol member with a bare `...` body is not abstract, so without the
+    # @abstractmethod decorator this class would instantiate happily and fail at
+    # delivery time. Anyone who does choose to inherit gets the refusal an
+    # abstract base class would have given them.
+    class Forgot(BodyFormat):
+        name = "forgot"
+        version = 1
+
+    with pytest.raises(TypeError, match="abstract method 'render'"):
+        Forgot()
+
+
+def _renderer(self, *, message_id: str, event_name: str, occurred_at: str, payload: dict) -> Any:
+    return RenderedBody(body=b"{}", content_type="application/json")
+
+
+#: One object per missing attribute, built rather than mutated. Deleting an
+#: attribute off a shared class leaks into every later test in the file, and the
+#: restore is a second thing to get wrong.
+_INCOMPLETE = {
+    "name": type("NoName", (), {"version": 1, "render": _renderer}),
+    "version": type("NoVersion", (), {"name": "x", "render": _renderer}),
+    "render": type("NoRender", (), {"name": "x", "version": 1}),
+}
+
+
+@pytest.mark.parametrize("attribute", list(_INCOMPLETE))
+def test_registration_refuses_an_object_missing_a_required_attribute(
+    registry: FormatRegistry, attribute: str
+) -> None:
+    with pytest.raises(TypeError, match=f"no {attribute!r}"):
+        registry.register(_INCOMPLETE[attribute]())
+
+
+def test_registration_refuses_a_render_that_is_not_callable(registry: FormatRegistry) -> None:
+    stub = _Stub("envelope", 1)
+    stub.render = "not a callable"
+    with pytest.raises(TypeError, match="not callable"):
+        registry.register(stub)
+
+
+def test_registration_refuses_a_render_with_the_wrong_keywords(
+    registry: FormatRegistry,
+) -> None:
+    # The check that neither the protocol nor isinstance can make. This object
+    # satisfies isinstance(x, BodyFormat) -- every attribute is present -- and
+    # would raise TypeError at delivery time, hours later, in another process.
+    class WrongKeywords:
+        name = "wrong"
+        version = 1
+
+        def render(self, *, message_id: str, payload: dict[str, Any]) -> RenderedBody:
+            return RenderedBody(body=b"{}", content_type="application/json")
+
+    assert isinstance(WrongKeywords(), BodyFormat), "isinstance sees only that render exists"
+    with pytest.raises(TypeError, match=r"'event_name', 'occurred_at'"):
+        registry.register(WrongKeywords())
+
+
+def test_a_render_taking_kwargs_is_accepted(registry: FormatRegistry) -> None:
+    # Forwarding wrappers are legitimate and cannot name the keywords, so **kwargs
+    # satisfies the check rather than failing it.
+    class Forwarding:
+        name = "forwarding"
+        version = 1
+
+        def render(self, **kwargs: Any) -> RenderedBody:
+            return RenderedBody(body=b"{}", content_type="application/json")
+
+    registry.register(Forwarding())
+    assert registry.published() == [FormatId(name="forwarding", version=1)]
+
+
+def test_positional_only_parameters_do_not_count_as_keywords(
+    registry: FormatRegistry,
+) -> None:
+    # A parameter named message_id that cannot be passed by name is not a
+    # parameter a delivery can fill, and the name alone would hide that.
+    class PositionalOnly:
+        name = "positional"
+        version = 1
+
+        def render(
+            self, message_id: str, event_name: str, occurred_at: str, payload: dict[str, Any], /
+        ) -> RenderedBody:
+            return RenderedBody(body=b"{}", content_type="application/json")
+
+    with pytest.raises(TypeError, match="does not accept"):
+        registry.register(PositionalOnly())

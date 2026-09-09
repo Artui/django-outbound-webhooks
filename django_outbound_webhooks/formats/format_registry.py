@@ -2,8 +2,66 @@
 
 from __future__ import annotations
 
+import inspect
+
 from django_outbound_webhooks.formats.body_format import BodyFormat
 from django_outbound_webhooks.types.format_id import FormatId
+
+#: The keywords a delivery calls ``render`` with. Checked at registration
+#: because a format is registered once, at startup, and called hours later in
+#: another process: a signature mismatch found then is a dead-lettered delivery
+#: with a TypeError on it. The substrate makes the same trade for the same
+#: reason -- its ``receiver`` decorator is overloaded so that declaring one
+#: arity and writing another fails at the decorator rather than in the relay.
+_RENDER_KEYWORDS = ("message_id", "event_name", "occurred_at", "payload")
+
+
+def _require_conforming(body_format: BodyFormat) -> None:
+    """Refuse an object that cannot serve as a body format, at registration.
+
+    Neither of the type-level tools does this job. ``isinstance`` against a
+    runtime-checkable protocol tests attribute *presence* only, so a ``render``
+    with entirely the wrong keywords satisfies it; and a protocol demands no
+    inheritance, so there is no constructor anywhere to enforce a shape. The
+    checker catches this for code it can see, and an operator's format lives in
+    a project it cannot.
+
+    The parameter is annotated as the thing this function verifies, which reads
+    as circular and is the usual arrangement: the annotation says what the
+    caller believes it is passing, and the body is what establishes whether that
+    was true.
+    """
+    for attribute in ("name", "version", "render"):
+        if not hasattr(body_format, attribute):
+            raise TypeError(
+                f"{type(body_format).__name__} cannot be published as a body format: it has "
+                f"no {attribute!r}. A format needs a name, a version and a render()."
+            )
+
+    render = body_format.render
+    if not callable(render):
+        raise TypeError(
+            f"{type(body_format).__name__}.render is not callable, so nothing could render a "
+            f"delivery with it."
+        )
+
+    parameters = inspect.signature(render).parameters
+    if any(kind.kind is inspect.Parameter.VAR_KEYWORD for kind in parameters.values()):
+        return
+
+    accepted = {
+        name
+        for name, parameter in parameters.items()
+        if parameter.kind
+        in (inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+    }
+    missing = [keyword for keyword in _RENDER_KEYWORDS if keyword not in accepted]
+    if missing:
+        raise TypeError(
+            f"{type(body_format).__name__}.render does not accept "
+            f"{', '.join(repr(name) for name in missing)} as a keyword. A delivery calls it "
+            f"with {', '.join(_RENDER_KEYWORDS)}, all by keyword."
+        )
 
 
 class FormatRegistry:
@@ -28,6 +86,7 @@ class FormatRegistry:
         receives under a signature that still verifies. Re-registering the same
         object is fine and is what a double import looks like.
         """
+        _require_conforming(body_format)
         identity = FormatId(name=body_format.name, version=body_format.version)
         existing = self._formats.get(identity)
         if existing is not None and existing is not body_format:
