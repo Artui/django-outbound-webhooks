@@ -148,7 +148,13 @@ def test_inheriting_the_protocol_still_refuses_a_missing_render() -> None:
         name = "forgot"
         version = 1
 
-    with pytest.raises(TypeError, match="abstract method 'render'"):
+    # Matched loosely on purpose. CPython words this differently across the
+    # supported range -- "with abstract method render" before 3.12, "without an
+    # implementation for abstract method 'render'" from 3.12 -- so pinning the
+    # phrasing makes the test an assertion about the interpreter's wording
+    # rather than about this package. What matters is that it refuses, and that
+    # it names the member.
+    with pytest.raises(TypeError, match=r"abstract method '?render'?"):
         Forgot()
 
 
