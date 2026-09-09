@@ -6,8 +6,19 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # Golden fixtures are exempt from both whitespace hooks, and this is a
+      # correctness exemption rather than a convenience. They hold the exact
+      # bytes a published format version renders, which is what an already
+      # integrated consumer receives and what the signature is computed over.
+      # end-of-file-fixer appends a newline to a file that has none, so with the
+      # fixtures in scope every regeneration and the hook take turns editing one
+      # file and the format gate compares against bytes the renderer never
+      # produced. The suite caught it, which is the only reason this is a
+      # comment rather than a bug.
       - id: trailing-whitespace
+        exclude: ^tests/fixtures/
       - id: end-of-file-fixer
+        exclude: ^tests/fixtures/
       - id: check-yaml
       - id: check-added-large-files
 
