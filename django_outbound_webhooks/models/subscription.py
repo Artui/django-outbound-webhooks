@@ -22,16 +22,29 @@ class Subscription(models.Model):
     A list of strings has nowhere to put them.
     """
 
-    # Django adds endpoint_id at runtime. The bare annotation makes it visible
-    # to ty, which never sees it -- the same fix django-domain-events uses on
-    # DeliveryRecord.event_id, reached there independently.
+    # Django creates endpoint_id at runtime -- Field.contribute_to_class installs
+    # a deferred-attribute descriptor -- and ty has no Django support, so nothing
+    # static can see it. The annotation supplies the type. django-domain-events
+    # reached the same fix independently, on DeliveryRecord.event_id.
     #
-    # Two things that do not remove the need for it, both tried 2026-09-10. The
-    # string reference below is right for its own reason (no model module
-    # imports another) and is unrelated to this. And django-stubs cannot supply
-    # it: <fk>_id is synthesised by the mypy plugin from the field's attname,
-    # not declared in any stub, and this family has no mypy for the plugin to
-    # run under.
+    # Tracked as astral-sh/ty#1018, milestone ty-1.1, implementation still open.
+    # Both annotations are removable one day by a ty release, not by anything in
+    # either repo.
+    #
+    # Four dead ends, all measured 2026-09-10. django-stubs is neither cause nor
+    # cure -- removing it entirely gives a byte-identical diagnostic, because
+    # <fk>_id comes from the mypy plugin shipped inside it and this family runs
+    # no mypy. django-types fails the same way. No ty version helps; the latest
+    # release errors. No config reaches it; a project with no ty settings at all
+    # errors identically. Nor does the declaration style: a class reference, the
+    # string reference below, a OneToOneField and even self.id all fail.
+    #
+    # Preferred over suppressing the rule, which also works: only the annotation
+    # supplies a real type, so self.endpoint_id.upper() is still caught.
+    #
+    # Strictly the value is int | None, being None on an unsaved instance. int is
+    # what the django-stubs plugin synthesises for a non-nullable key, and
+    # matching that is the more useful simplification.
     endpoint_id: int
 
     endpoint = models.ForeignKey(

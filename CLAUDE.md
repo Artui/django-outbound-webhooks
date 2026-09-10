@@ -87,6 +87,26 @@ Each of these reads as an oversight and is not.
   explicitly and **fail closed**: an event carrying no tenant scope goes to no
   customer endpoint, never to all of them.
 
+## Two things this package's own conventions collide with
+
+Both were found by hitting them, and both will recur.
+
+- **A callable Django serialises into a migration must not live at a path the
+  package `__init__` shadows.** One-symbol-per-file means a module is named after
+  the symbol it exports, and re-exporting that symbol from `__init__` makes the
+  package attribute win: `import django_outbound_webhooks.validate_webhook_url`
+  then binds the **function**, so the migration's dotted path becomes an
+  attribute lookup on a function and **no migration in the app can run**. The two
+  field validators are therefore not re-exported. The same applies to a
+  `default=` callable, an `upload_to=` and a `through=`. `tests/test_migrations.py`
+  names the hazard; it first surfaced through an unrelated database test.
+- **`ty` cannot see a foreign key's implicit `<fk>_id`**, because Django creates
+  it at runtime and ty has no Django support. Declare it as a bare annotation
+  beside the field, which supplies a real type rather than merely silencing the
+  rule. Do not reach for django-stubs, a newer ty, a config setting or a different
+  declaration style; all four were measured and none of them helps. Tracked
+  upstream as astral-sh/ty#1018.
+
 ## Adding a feature
 
 Branch first, always. Three touchpoints per change: the source file, the
