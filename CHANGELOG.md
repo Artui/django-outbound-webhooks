@@ -24,14 +24,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sequence of secrets rather than one, so signing with an outgoing and an
   incoming secret at once gives the rotation overlap the specification already
   allows for.
-- `DJANGO_OUTBOUND_WEBHOOKS` settings, with `DEFAULT_FORMAT` as the only key so
-  far.
+- `Endpoint` and `Subscription`: the customer-owned registry. An endpoint carries
+  its URL, its signing secret, the format version it is pinned to and the tenant
+  it belongs to; subscriptions are rows rather than a list on the endpoint, so
+  "which endpoints want this event" is an indexed lookup that reads the same on
+  every backend.
+- `endpoints_for`, which answers that question inside the tenant boundary. With
+  `TENANT_SCOPE_KEY` configured, an event carrying no usable value under that key
+  matches nothing at all.
+- `DJANGO_OUTBOUND_WEBHOOKS` settings: `DEFAULT_FORMAT` and `TENANT_SCOPE_KEY`.
 
 - `FormatRegistry.register` checks conformance and refuses at registration: a
   missing attribute, a `render` that is not callable, or a `render` that does not
   accept the keywords a delivery calls it with. Neither the protocol nor
   `isinstance` can make that check, and a format is registered once at startup
   and called hours later in another process.
+
+### Security
+- Endpoint validation runs on save rather than waiting for a form, because these
+  rows come from a self-service surface and two of the checks are silent when
+  they fail. The signing secret must be real base64: the signing library decodes
+  with `validate=False`, so a secret containing any character outside the
+  alphabet has that character discarded and the rest decoded to different bytes.
+  It signs without complaint and only the customer's verification fails, on their
+  side, with no signal on ours.
+- Endpoint matching fails closed. An event with no usable tenant value reaches no
+  customer endpoint, rather than reaching all of them.
 
 ### Fixed
 - Timestamps handed to the signing library are converted to UTC first. Its

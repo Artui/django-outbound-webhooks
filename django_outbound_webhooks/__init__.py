@@ -1,5 +1,6 @@
 """Outbound webhooks for Django, delivered as a durable receiver."""
 
+from django_outbound_webhooks.endpoints_for import endpoints_for
 from django_outbound_webhooks.formats.body_format import BodyFormat
 from django_outbound_webhooks.formats.envelope_v1 import EnvelopeV1
 from django_outbound_webhooks.formats.format_registry import FormatRegistry, formats
@@ -15,6 +16,7 @@ __all__ = [
     "FormatRegistry",
     "RenderedBody",
     "__version__",
+    "endpoints_for",
     "formats",
     "sign_request",
 ]
