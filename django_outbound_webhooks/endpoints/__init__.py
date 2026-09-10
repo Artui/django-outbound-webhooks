@@ -1,14 +1,13 @@
 """The customer-owned endpoint registry, and who an event is owed to.
 
-``validate_webhook_url`` is deliberately absent, for the same reason as its twin
-in ``signing``: it is referenced by a model field, so its dotted path is frozen
-in the migration, and re-exporting it here would shadow the submodule that path
-names. Import it from
-``django_outbound_webhooks.endpoints.validate_webhook_url``.
+Deliberately no re-exports. These are internal groupings, not public namespaces:
+the package root is the public surface and re-exports everything, and every
+module inside the package imports its neighbours by leaf path already.
+
+Re-exporting here would buy nothing and cost a class of circular import, since a
+leaf import runs the parent package first. django-domain-events learned that in
+its own regroup, where an eager __init__ made a leaf import pull in a module that
+imported back out. It also removes a carve-out this package used to need: with
+nothing re-exported, no subpackage attribute can shadow the submodule whose
+dotted path a migration froze.
 """
-
-from django_outbound_webhooks.endpoints.endpoints_for import endpoints_for
-from django_outbound_webhooks.endpoints.pinned_format import pinned_format
-from django_outbound_webhooks.endpoints.register_endpoint import register_endpoint
-
-__all__ = ["endpoints_for", "pinned_format", "register_endpoint"]
