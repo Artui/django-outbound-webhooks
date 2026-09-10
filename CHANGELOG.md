@@ -68,6 +68,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   import for no benefit, and it removes the carve-out the two field validators
   used to need.
 
+- The fan-out: `WebhookDeliveryDue`, `fan_out`, `register_fan_out` and
+  `deliver_due`. A domain event becomes one fired event per subscribed endpoint,
+  so each delivery carries its own attempt count, backoff, dead-letter and
+  replay, and one rotted endpoint cannot drag the others through a retry curve.
+- A system check, `django_outbound_webhooks.W001`, for a declared event with no
+  fan-out receiver. The fan-out is wired by walking the event registry at
+  `ready()`, since the substrate has no wildcard receiver, so listing this app
+  before `django_domain_events` leaves events uncovered and nothing raises.
+- `DELIVERY_LEASE_SECONDS`, which is both the receiver's lease and the inner
+  retry's budget. One setting, because they are the same quantity from two sides.
+
 ### Security
 - `validate_signing_secret` requires real base64. The signing library decodes with
   `validate=False`, so a secret containing any character outside the alphabet has

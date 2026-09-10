@@ -45,6 +45,11 @@ DEFAULTS: dict[str, Any] = {
     # A customer's endpoint answering with a redirect has been misconfigured.
     # Following a couple is a kindness; following a chain is an open proxy.
     "MAX_REDIRECTS": 2,
+    # The lease the delivery receiver claims, and the budget the inner retry is
+    # bounded by. One setting rather than two, because the receiver's lease and
+    # the retry's deadline are the same quantity seen from two sides, and two
+    # numbers is two ways for them to disagree.
+    "DELIVERY_LEASE_SECONDS": 60,
 }
 
 

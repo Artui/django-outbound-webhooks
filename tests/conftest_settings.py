@@ -17,7 +17,13 @@ INSTALLED_APPS = [
     # receivers are registered against, so its app has to be installed for
     # either package's models to load.
     "django_domain_events",
+    # After django_domain_events, and that is the whole ordering rule. The
+    # substrate autodiscovers every app's events.py from its own ready(), so by
+    # the time this package walks the registry every event is in it -- wherever
+    # the app declaring it sits. Put this package first and the registry is
+    # empty when it looks, silently.
     "django_outbound_webhooks",
+    "tests.testapp",
 ]
 
 DATABASES = {
