@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from standardwebhooks import Webhook, WebhookVerificationError
 
-from django_outbound_webhooks.sign_request import sign_request
+from django_outbound_webhooks.signing.sign_request import sign_request
 
 SECRET = base64.b64encode(b"a-signing-secret-of-some-length").decode()
 OTHER_SECRET = base64.b64encode(b"the-incoming-rotation-secret!!!").decode()

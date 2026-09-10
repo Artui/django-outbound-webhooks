@@ -49,8 +49,21 @@ Non-negotiable. They keep the package navigable.
 6. **`__init__.py` is the only re-export point.** Each `__init__.py` lists the
    public surface in `__all__`. Internal modules import from leaf paths, never
    from the package's `__init__`.
-7. **Types live in `types/`.** Value-shape carriers live under `types/`;
-   behavioural code lives at the package root.
+7. **The package root is a table of contents, not a drawer.** It holds
+   `__init__.py`, `version.py`, `settings.py`, `apps.py` and nothing else;
+   everything the package does lives in a subpackage. A subpackage is named for
+   a **concern** (`signing/`, `endpoints/`, `formats/`) and never for a kind of
+   thing - `helpers/`, `core/`, `common/` and `misc/` name nothing and become a
+   flat root one level down. Three modules on one concern earn a directory.
+   `types/` is the one standing subpackage, for value-shape carriers.
+
+   This replaced a rule that read "behavioural code lives at the package
+   root", which actively mandated the flat root and had already produced
+   same-named module pairs next door in `django-domain-events`. Every rule
+   above it governs a file; this is the one that governs a directory, and its
+   absence is why a package can obey all six and still put everything in one
+   place. There is no `exceptions/`: an exception lives in the subpackage that
+   raises it.
 
 ## Constraints that look like tidy-ups
 
@@ -99,7 +112,17 @@ Both were found by hitting them, and both will recur.
   attribute lookup on a function and **no migration in the app can run**. The two
   field validators are therefore not re-exported. The same applies to a
   `default=` callable, an `upload_to=` and a `through=`. `tests/test_migrations.py`
-  names the hazard; it first surfaced through an unrelated database test.
+  names the hazard; it first surfaced through an unrelated database test. It
+  applies at every depth: a subpackage `__init__` shadows its own submodules
+  exactly as the package root does, which is why neither `signing/__init__.py`
+  nor `endpoints/__init__.py` re-exports its validator either.
+
+  **Moving such a module is a cost, not a law, and the owner prices it.** The
+  cost is proportional to installs with history, which for this package is
+  **zero** - nothing has been published and `0001_initial` has never reached
+  `main`. That is why both validators moved into their concern groups on
+  2026-09-10 and the migration was regenerated with them. Once there is a
+  release, the answer changes.
 - **`ty` cannot see a foreign key's implicit `<fk>_id`**, because Django creates
   it at runtime and ty has no Django support. Do not reach for django-stubs, a
   newer ty, a config setting or a different declaration style; all four were

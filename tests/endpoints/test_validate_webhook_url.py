@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from django.core.exceptions import ValidationError
 
-from django_outbound_webhooks.validate_webhook_url import validate_webhook_url
+from django_outbound_webhooks.endpoints.validate_webhook_url import validate_webhook_url
 
 
 @pytest.mark.parametrize("url", ["https://example.test/hooks", "http://example.test:8080/x?y=1"])

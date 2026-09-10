@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from django_outbound_webhooks.models.endpoint import Endpoint
-from django_outbound_webhooks.signing_secrets import signing_secrets
+from django_outbound_webhooks.signing.signing_secrets import signing_secrets
 
 
 def test_one_column_today_still_answers_with_a_list() -> None:

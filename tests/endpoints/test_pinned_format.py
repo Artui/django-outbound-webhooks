@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from django_outbound_webhooks.endpoints.pinned_format import pinned_format
 from django_outbound_webhooks.models.endpoint import Endpoint
-from django_outbound_webhooks.pinned_format import pinned_format
 from django_outbound_webhooks.types.format_id import FormatId
 
 

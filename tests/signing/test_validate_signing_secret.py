@@ -8,7 +8,7 @@ import pytest
 from django.core.exceptions import ValidationError
 from standardwebhooks import Webhook
 
-from django_outbound_webhooks.validate_signing_secret import validate_signing_secret
+from django_outbound_webhooks.signing.validate_signing_secret import validate_signing_secret
 
 SECRET = base64.b64encode(b"a-signing-secret-of-some-length").decode()
 

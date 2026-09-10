@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from django.db import models
 
-from django_outbound_webhooks.validate_signing_secret import validate_signing_secret
-from django_outbound_webhooks.validate_webhook_url import validate_webhook_url
+from django_outbound_webhooks.endpoints.validate_webhook_url import validate_webhook_url
+from django_outbound_webhooks.signing.validate_signing_secret import validate_signing_secret
 
 
 class Endpoint(models.Model):

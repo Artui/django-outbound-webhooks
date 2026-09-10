@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Initial scaffold.
+- Layout: the package root holds `__init__.py`, `version.py`, `settings.py` and
+  `apps.py`, with everything else under a subpackage named for a concern -
+  `signing/`, `endpoints/`, `formats/`, `models/`, `types/`.
 - Body formats: `BodyFormat` (a `Protocol`, so an operator's own format inherits
   nothing from this package), a `FormatRegistry` keyed by name and version, and
   `EnvelopeV1` as the first published format. An endpoint pins the version it

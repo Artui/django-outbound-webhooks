@@ -16,7 +16,7 @@ def test_the_apps_migrations_load() -> None:
     # every module after the single symbol it exports. Re-export such a symbol
     # from the package __init__ and the package attribute *shadows the
     # submodule*: the migration's
-    # `django_outbound_webhooks.validate_webhook_url.validate_webhook_url`
+    # `django_outbound_webhooks.endpoints.validate_webhook_url.validate_webhook_url`
     # becomes an attribute lookup on a function and raises AttributeError, at
     # which point no migration in the app can run.
     #
@@ -31,11 +31,11 @@ def test_the_validator_paths_the_migration_uses_still_resolve() -> None:
     # Naming the exact hazard: each of these has to be importable as
     # module-then-attribute, which is how the migration spells it.
     for module_path, symbol in [
-        ("django_outbound_webhooks.validate_webhook_url", "validate_webhook_url"),
-        ("django_outbound_webhooks.validate_signing_secret", "validate_signing_secret"),
+        ("django_outbound_webhooks.endpoints.validate_webhook_url", "validate_webhook_url"),
+        ("django_outbound_webhooks.signing.validate_signing_secret", "validate_signing_secret"),
     ]:
         module = importlib.import_module(module_path)
         assert callable(getattr(module, symbol, None)), (
             f"{module_path}.{symbol} does not resolve. Something re-exported {symbol!r} from "
-            f"the package __init__, which shadows the submodule of the same name."
+            f"a package __init__, which shadows the submodule of the same name."
         )

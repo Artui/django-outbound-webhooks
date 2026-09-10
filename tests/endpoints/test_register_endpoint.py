@@ -7,9 +7,9 @@ import base64
 import pytest
 from django.core.exceptions import ValidationError
 
+from django_outbound_webhooks.endpoints.register_endpoint import register_endpoint
 from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.models.subscription import Subscription
-from django_outbound_webhooks.register_endpoint import register_endpoint
 
 SECRET = base64.b64encode(b"a-signing-secret-of-some-length").decode()
 
@@ -108,7 +108,7 @@ class TestWithTenancy:
         # non-blank value and a blank column can never equal one. The refusal
         # stops an operator creating a row that silently never fires; it does
         # not close a hole.
-        from django_outbound_webhooks.endpoints_for import endpoints_for
+        from django_outbound_webhooks.endpoints.endpoints_for import endpoints_for
 
         endpoint = _register(tenant="acme")
         Endpoint.objects.filter(pk=endpoint.pk).update(tenant="")

@@ -6,7 +6,7 @@ import base64
 
 import pytest
 
-from django_outbound_webhooks.endpoints_for import endpoints_for
+from django_outbound_webhooks.endpoints.endpoints_for import endpoints_for
 from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.models.subscription import Subscription
 
