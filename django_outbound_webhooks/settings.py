@@ -20,6 +20,17 @@ DEFAULTS: dict[str, Any] = {
     # problem one level down, and it is the problem this package exists not to
     # hand its customers.
     "DEFAULT_FORMAT": "envelope",
+    # Which key in an event's scope names the customer an event belongs to, or
+    # None for a deployment that has no such notion.
+    #
+    # This is the isolation boundary, so it is a deployment-level decision
+    # rather than a per-row default. With a key configured, an endpoint must
+    # name a tenant and an event must carry that key, and an event that does not
+    # matches no endpoint at all. With it None there is no tenancy and every
+    # active subscriber matches, which is correct for a single-tenant
+    # deployment and is the sort of thing that has to be chosen rather than
+    # inherited from a blank column.
+    "TENANT_SCOPE_KEY": None,
 }
 
 
