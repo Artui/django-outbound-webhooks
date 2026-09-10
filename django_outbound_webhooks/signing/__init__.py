@@ -1,14 +1,13 @@
 """Signing a delivery to the Standard Webhooks specification.
 
-``validate_signing_secret`` is deliberately absent from ``__all__`` and from the
-imports above. It is referenced by a model field, so Django writes its dotted
-path into the migration, and re-exporting a symbol whose module carries the same
-name makes this package's attribute shadow that submodule -- at which point the
-migration's path resolves to a function and no migration in the app can run.
-Import it from ``django_outbound_webhooks.signing.validate_signing_secret``.
+Deliberately no re-exports. These are internal groupings, not public namespaces:
+the package root is the public surface and re-exports everything, and every
+module inside the package imports its neighbours by leaf path already.
+
+Re-exporting here would buy nothing and cost a class of circular import, since a
+leaf import runs the parent package first. django-domain-events learned that in
+its own regroup, where an eager __init__ made a leaf import pull in a module that
+imported back out. It also removes a carve-out this package used to need: with
+nothing re-exported, no subpackage attribute can shadow the submodule whose
+dotted path a migration froze.
 """
-
-from django_outbound_webhooks.signing.sign_request import sign_request
-from django_outbound_webhooks.signing.signing_secrets import signing_secrets
-
-__all__ = ["sign_request", "signing_secrets"]

@@ -31,6 +31,20 @@ DEFAULTS: dict[str, Any] = {
     # deployment and is the sort of thing that has to be chosen rather than
     # inherited from a blank column.
     "TENANT_SCOPE_KEY": None,
+    # How long one HTTP request may take. Counted against the lease below, so
+    # raising it shrinks the room the inner retry has to work in.
+    "TIMEOUT_SECONDS": 10.0,
+    # The first inner sleep. Doubles from there, capped by the deadline rather
+    # than by a separate ceiling: the deadline is the real budget and a second
+    # limit would only be a way for the two to disagree.
+    "INNER_BACKOFF_BASE_SECONDS": 0.5,
+    # Slack left inside the lease after the last attempt could finish. Clock
+    # skew, connection setup and the substrate's own bookkeeping all land here,
+    # and the cost of being wrong is a duplicate delivery.
+    "LEASE_MARGIN_SECONDS": 2.0,
+    # A customer's endpoint answering with a redirect has been misconfigured.
+    # Following a couple is a kindness; following a chain is an open proxy.
+    "MAX_REDIRECTS": 2,
 }
 
 

@@ -52,6 +52,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `isinstance` can make that check, and a format is registered once at startup
   and called hours later in another process.
 
+- Delivery: `send_webhook` posts a rendered, signed body and retries inside the
+  lease. `send_once` is one attempt, `classify_response` reads a status as a
+  verdict, `retry_policy` builds the tenacity object per delivery, and
+  `lease_deadline` holds the arithmetic that keeps it all inside the lease.
+  `webhook_client` is the httpx2 client, with redirects followed but capped.
+- `DeliveryVerdict`, because a webhook's outcome is a status code and therefore a
+  return value. The substrate can only retry what raises, so it retries
+  everything to the attempt budget and no receiver can say a failure is terminal;
+  modelling the verdict as data is what lets the inner policy stop on `410 Gone`.
+- Settings: `TIMEOUT_SECONDS`, `INNER_BACKOFF_BASE_SECONDS`,
+  `LEASE_MARGIN_SECONDS` and `MAX_REDIRECTS`.
+- Concern subpackages re-export nothing; their `__init__.py` is a docstring. A
+  leaf import runs the parent first, so an eager one costs a class of circular
+  import for no benefit, and it removes the carve-out the two field validators
+  used to need.
+
 ### Security
 - `validate_signing_secret` requires real base64. The signing library decodes with
   `validate=False`, so a secret containing any character outside the alphabet has
