@@ -80,6 +80,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   retry's budget. One setting, because they are the same quantity from two sides.
 
 ### Security
+- Server-side request forgery is defended at the transport, because that is where
+  the defence has to live. `PinningTransport` resolves the hostname, checks
+  **every** address it answers with, and then connects to the address it
+  checked. Checking a name and handing the name to the connection layer is a race
+  rather than a defence: the attacker controls the DNS answer, so a record with a
+  one-second lifetime is enough for the resolution that was checked and the
+  resolution that is dialled to differ. TLS survives the rewrite because the
+  connection layer takes its `server_hostname` from an SNI override, so the
+  handshake and the certificate check still use the customer's real hostname.
+- `check_address` refuses private, loopback, link-local, reserved, multicast,
+  unspecified and carrier-grade NAT addresses. `is_private` alone is the obvious
+  single test and it is not enough: measured against Python's own
+  classification, carrier-grade NAT and multicast are not private, and the first
+  of those is routable inside a provider's network while being unreachable from
+  the public internet.
+- `ALLOW_PRIVATE_ADDRESSES` relaxes private and loopback only, so a developer can
+  deliver to a container or a tunnel. It deliberately does not relax link-local,
+  where the cloud metadata endpoint lives, nor multicast, unspecified or
+  carrier-grade NAT. "Let me reach localhost" is never a request to reach the
+  metadata service.
 - `validate_signing_secret` requires real base64. The signing library decodes with
   `validate=False`, so a secret containing any character outside the alphabet has
   that character discarded and the rest decoded to different bytes. It signs

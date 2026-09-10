@@ -50,6 +50,14 @@ DEFAULTS: dict[str, Any] = {
     # the retry's deadline are the same quantity seen from two sides, and two
     # numbers is two ways for them to disagree.
     "DELIVERY_LEASE_SECONDS": 60,
+    # Development escape hatch, and deliberately a partial one. Turning it on
+    # allows private and loopback addresses, so a developer can deliver to a
+    # tunnel or a container on their own machine. It does not allow link-local,
+    # which is where the cloud metadata endpoint lives, nor multicast, reserved,
+    # unspecified or carrier-grade NAT space: "let me reach localhost" is never
+    # a request to reach any of those, and a single flag that granted all of it
+    # would be one setting away from the worst outcome this package has.
+    "ALLOW_PRIVATE_ADDRESSES": False,
 }
 
 
