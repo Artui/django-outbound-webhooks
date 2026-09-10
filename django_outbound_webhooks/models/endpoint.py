@@ -21,6 +21,16 @@ class Endpoint(models.Model):
     admin, a serializer, and ``register_endpoint``.
     """
 
+    #: What the customer calls this endpoint. Required, because a customer with
+    #: several endpoints has no other way to tell them apart: a URL is long, a
+    #: primary key is meaningless to them, and both appear in the delivery log
+    #: and in every support conversation about a failing integration.
+    #:
+    #: Not unique. Two endpoints called "production" are confusing rather than
+    #: harmful, and a uniqueness constraint on a field a customer types is a
+    #: refusal they cannot act on when the clash is with a row they cannot see.
+    name = models.CharField(max_length=100)
+
     url = models.URLField(max_length=2000, validators=[validate_webhook_url])
     secret = models.CharField(
         max_length=255,
@@ -47,4 +57,4 @@ class Endpoint(models.Model):
         indexes = [models.Index(fields=["is_active", "tenant"])]
 
     def __str__(self) -> str:
-        return f"{self.url} ({self.format_name}@{self.format_version})"
+        return f"{self.name} ({self.url})"

@@ -25,8 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   incoming secret at once gives the rotation overlap the specification already
   allows for.
 - `Endpoint` and `Subscription`: the customer-owned registry. An endpoint carries
-  its URL, its signing secret, the format version it is pinned to and the tenant
-  it belongs to; subscriptions are rows rather than a list on the endpoint, so
+  a name its owner chose, its URL, its signing secret, the format version it is
+  pinned to and the tenant it belongs to; subscriptions are rows rather than a list on the endpoint, so
   "which endpoints want this event" is an indexed lookup that reads the same on
   every backend.
 - `endpoints_for`, which answers that question inside the tenant boundary. With

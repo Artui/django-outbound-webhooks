@@ -18,6 +18,7 @@ pytestmark = pytest.mark.django_db
 
 def _register(**overrides: object) -> Endpoint:
     fields: dict[str, object] = {
+        "name": "Acme production",
         "url": "https://example.test/hooks",
         "secret": SECRET,
         "event_names": ["shop.OrderPlaced"],
@@ -113,3 +114,18 @@ class TestWithTenancy:
         Endpoint.objects.filter(pk=endpoint.pk).update(tenant="")
         matched = endpoints_for(event_name="shop.OrderPlaced", scope={"tenant": "acme"})
         assert list(matched) == []
+
+
+def test_the_name_is_what_identifies_an_endpoint_to_its_owner() -> None:
+    # A customer with several endpoints has no other way to tell them apart:
+    # a URL is long and a primary key means nothing to them.
+    endpoint = _register(name="Acme staging")
+    assert str(endpoint) == "Acme staging (https://example.test/hooks)"
+
+
+def test_two_endpoints_may_share_a_name() -> None:
+    # Deliberately not unique. A uniqueness refusal on a field a customer types
+    # is one they cannot act on when the clash is with a row they cannot see.
+    _register(name="production")
+    _register(name="production", url="https://other.test/hooks")
+    assert Endpoint.objects.filter(name="production").count() == 2

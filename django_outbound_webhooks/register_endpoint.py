@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 def register_endpoint(
     *,
+    name: str,
     url: str,
     secret: str,
     event_names: Sequence[str],
@@ -77,6 +78,7 @@ def register_endpoint(
         formats.get(pinned)
 
     endpoint = Endpoint(
+        name=name,
         url=url,
         secret=secret,
         format_name=pinned.name,

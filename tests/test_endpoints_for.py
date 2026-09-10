@@ -17,6 +17,7 @@ pytestmark = pytest.mark.django_db
 
 def _subscribed(event_name: str = "shop.OrderPlaced", **overrides: object) -> Endpoint:
     fields: dict[str, object] = {
+        "name": "Acme production",
         "url": "https://example.test/hooks",
         "secret": SECRET,
         "format_name": "envelope",

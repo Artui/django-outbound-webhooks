@@ -16,6 +16,7 @@ pytestmark = pytest.mark.django_db
 
 def _endpoint(**overrides: object) -> Endpoint:
     fields: dict[str, object] = {
+        "name": "Acme production",
         "url": "https://example.test/hooks",
         "secret": SECRET,
         "format_name": "envelope",
@@ -33,7 +34,7 @@ def test_it_stores_a_row_with_sensible_defaults() -> None:
 
 
 def test_str_names_the_url_and_the_pinned_format() -> None:
-    assert str(_endpoint()) == "https://example.test/hooks (envelope@1)"
+    assert str(_endpoint()) == "Acme production (https://example.test/hooks)"
 
 
 def test_the_field_validators_fire_wherever_full_clean_runs() -> None:

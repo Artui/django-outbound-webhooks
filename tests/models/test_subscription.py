@@ -18,6 +18,7 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def endpoint() -> Endpoint:
     return Endpoint.objects.create(
+        name="Acme production",
         url="https://example.test/hooks",
         secret=SECRET,
         format_name="envelope",
@@ -47,4 +48,20 @@ def test_deleting_an_endpoint_takes_its_subscriptions(endpoint: Endpoint) -> Non
 
 def test_str_names_the_event_and_the_endpoint(endpoint: Endpoint) -> None:
     subscription = Subscription.objects.create(endpoint=endpoint, event_name="shop.OrderPlaced")
-    assert str(subscription) == f"shop.OrderPlaced -> {endpoint.pk}"
+    assert str(subscription) == "shop.OrderPlaced -> Acme production"
+
+
+def test_str_traverses_the_endpoint_rather_than_reading_its_key(
+    endpoint: Endpoint, django_assert_num_queries: object
+) -> None:
+    # The cost of naming the endpoint instead of its id, stated rather than
+    # discovered: one query per instance that did not fetch the relation. Any
+    # listing rendering this needs select_related("endpoint"), which is the
+    # obligation the 0.4.0 admin inherits.
+    subscription = Subscription.objects.create(endpoint=endpoint, event_name="shop.OrderPlaced")
+    fresh = Subscription.objects.get(pk=subscription.pk)
+    with django_assert_num_queries(1):
+        str(fresh)
+    prefetched = Subscription.objects.select_related("endpoint").get(pk=subscription.pk)
+    with django_assert_num_queries(0):
+        str(prefetched)
