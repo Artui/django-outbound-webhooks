@@ -32,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `endpoints_for`, which answers that question inside the tenant boundary. With
   `TENANT_SCOPE_KEY` configured, an event carrying no usable value under that key
   matches nothing at all.
+- `register_endpoint`, the supported way to add one. It is where the cross-field
+  rules and the format pinning live: an unpinned registration pins whatever is
+  latest and records that number, and a version that was never published is
+  refused at registration rather than at the first delivery.
+- `pinned_format`, `signing_secrets`, `validate_webhook_url` and
+  `validate_signing_secret`. The models carry fields and a `__str__` and nothing
+  else, so everything that interprets a column lives beside the code that acts on
+  it. The two validators are declared on their fields, so a form, the admin and a
+  serializer all get them.
 - `DJANGO_OUTBOUND_WEBHOOKS` settings: `DEFAULT_FORMAT` and `TENANT_SCOPE_KEY`.
 
 - `FormatRegistry.register` checks conformance and refuses at registration: a
@@ -41,13 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and called hours later in another process.
 
 ### Security
-- Endpoint validation runs on save rather than waiting for a form, because these
-  rows come from a self-service surface and two of the checks are silent when
-  they fail. The signing secret must be real base64: the signing library decodes
-  with `validate=False`, so a secret containing any character outside the
-  alphabet has that character discarded and the rest decoded to different bytes.
-  It signs without complaint and only the customer's verification fails, on their
-  side, with no signal on ours.
+- `validate_signing_secret` requires real base64. The signing library decodes with
+  `validate=False`, so a secret containing any character outside the alphabet has
+  that character discarded and the rest decoded to different bytes. It signs
+  without complaint and only the customer's verification fails, on their side,
+  with no signal on ours.
 - Endpoint matching fails closed. An event with no usable tenant value reaches no
   customer endpoint, rather than reaching all of them.
 

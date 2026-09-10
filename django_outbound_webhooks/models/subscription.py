@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from django.db import models
 
-from django_outbound_webhooks.models.endpoint import Endpoint
-
 
 class Subscription(models.Model):
     """The link between an endpoint and one event name.
@@ -24,12 +22,23 @@ class Subscription(models.Model):
     A list of strings has nowhere to put them.
     """
 
-    endpoint = models.ForeignKey(Endpoint, related_name="subscriptions", on_delete=models.CASCADE)
-    #: Django creates this attribute from the foreign key above, so the checker
-    #: cannot see it. Declaring it costs nothing at runtime -- a bare annotation
-    #: never reaches the model metaclass -- and reading the key without it means
-    #: either a query for a row we already have, or printing the wrong id.
+    # Django adds endpoint_id at runtime. The bare annotation makes it visible
+    # to ty, which never sees it -- the same fix django-domain-events uses on
+    # DeliveryRecord.event_id, reached there independently.
+    #
+    # Two things that do not remove the need for it, both tried 2026-09-10. The
+    # string reference below is right for its own reason (no model module
+    # imports another) and is unrelated to this. And django-stubs cannot supply
+    # it: <fk>_id is synthesised by the mypy plugin from the field's attname,
+    # not declared in any stub, and this family has no mypy for the plugin to
+    # run under.
     endpoint_id: int
+
+    endpoint = models.ForeignKey(
+        "django_outbound_webhooks.Endpoint",
+        related_name="subscriptions",
+        on_delete=models.CASCADE,
+    )
     event_name = models.CharField(max_length=255, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
