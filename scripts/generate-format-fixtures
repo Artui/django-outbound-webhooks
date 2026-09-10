@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Write the golden fixture for every published body format.
+
+Run from the repository root, naming the directory to write into:
+
+    uv run scripts/generate-format-fixtures tests/fixtures/formats
+
+A published format version is frozen: an endpoint pins the version it was
+integrated against, so changing what an old version renders changes what an
+already-integrated consumer receives, under a signature that still verifies.
+These fixtures are what turn that from a note into a gate -- the suite renders
+each case again and compares byte for byte, so editing an old formatter goes
+red.
+
+The bytes come from the package's own renderer rather than being typed out by
+hand. A hand-written expectation is a second implementation of the format, and
+the two agree only until one of them is wrong.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2:
+        print(__doc__, file=sys.stderr)
+        return 2
+
+    out = Path(argv[1])
+    if not out.is_dir():
+        print(f"Not a directory: {out}", file=sys.stderr)
+        return 2
+
+    # Run from the repository root so `tests` and the package both import.
+    sys.path.insert(0, os.getcwd())
+
+    import django
+    from django.conf import settings
+
+    if not settings.configured:
+        os.environ.setdefault("DJANGO_SETTINGS_MODULE", "tests.conftest_settings")
+    django.setup()
+
+    from tests.format_samples import CASES, rendered
+
+    for name in sorted(CASES):
+        path = out / name
+        body = rendered(name)
+        previous = path.read_bytes() if path.exists() else None
+        path.write_bytes(body)
+        state = "unchanged" if previous == body else ("written" if previous is None else "CHANGED")
+        print(f"{state}: {path} ({len(body)} bytes)")
+        if state == "CHANGED":
+            print(
+                "  A published format rendered different bytes than the fixture it was "
+                "released with. If that was deliberate, it is a new version, not an edit.",
+                file=sys.stderr,
+            )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
