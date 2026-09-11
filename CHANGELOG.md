@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-09-11
+
 ### Added
 - Initial scaffold.
+
+This first release covers both milestones the plan had queued: the registry,
+signing, fan-out and delivery, and the delivery log and request-forgery policy
+that were planned a release later. They are here together because they were built
+together, and holding half of it back to match a milestone number would have
+shipped a package that posts to whatever URL a customer types.
 - Layout: the package root holds `__init__.py`, `version.py`, `settings.py` and
   `apps.py`, with everything else under a subpackage named for a concern -
   `signing/`, `endpoints/`, `formats/`, `models/`, `types/`.
@@ -134,4 +142,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offset and every conforming receiver rejects it as too old or too new, which
   presents as a signature failure carrying a correct signature.
 
-[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.0.0...HEAD
+[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.0.0...v0.1.0
