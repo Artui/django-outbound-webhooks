@@ -79,6 +79,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DELIVERY_LEASE_SECONDS`, which is both the receiver's lease and the inner
   retry's budget. One setting, because they are the same quantity from two sides.
 
+- The delivery log: `DeliveryAttempt`, one row per HTTP request rather than per
+  delivery, carrying the request's body hash and size, the response status and a
+  truncated body, the duration and the verdict. The two attempt numbers are named
+  for the tier each counts, because they multiply rather than add and a log
+  calling either of them "attempt" would make every number in it ambiguous.
+- It records failures, which is the half that needed `django-domain-events`
+  0.8.0. A receiver's writes are discarded the moment it raises, so before the
+  `on_failure` hook this table would have held successes and nothing else.
+- The endpoint link is nulled rather than cascaded when a customer deletes an
+  endpoint, and the URL is denormalised onto each row: a log whose rows disappear
+  with the thing they are evidence about is not a log, and the question it answers
+  is where the request went, not where it would go now.
+- `LOG_BODY_CHARS`, which bounds how much of a response the log keeps.
+
+### Changed
+- The `django-domain-events` floor is now `>=0.8.0`, for the receiver's
+  `on_failure` hook.
+
 ### Security
 - Server-side request forgery is defended at the transport, because that is where
   the defence has to live. `PinningTransport` resolves the hostname, checks

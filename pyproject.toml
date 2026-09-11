@@ -39,10 +39,12 @@ classifiers = [
 dependencies = [
     # The substrate. Durability, at-least-once delivery inside the firing
     # transaction, per-receiver retry, dead-lettering and replay all live there
-    # and are deliberately not rebuilt here. The 0.7.0 floor is the release
-    # whose delivery rows carry the lease this package's inner retry policy is
-    # bounded by; below it there is no lease to bound against.
-    "django-domain-events>=0.7.0",
+    # and are deliberately not rebuilt here. The floor buys the receiver's
+    # on_failure hook, without which the delivery log records successes and
+    # silently loses every failure: a receiver runs inside the transaction
+    # carrying its acknowledgement, so everything it writes is discarded the
+    # moment it raises.
+    "django-domain-events>=0.8.0",
     # The transport. Chosen over its predecessor because the request-forgery
     # policy is a transport concern: pinning a validated address while TLS still
     # validates the customer's hostname needs the connection layer's SNI

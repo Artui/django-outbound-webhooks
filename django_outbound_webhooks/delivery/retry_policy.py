@@ -46,7 +46,7 @@ def retry_policy(
             )
         ),
         wait=wait_exponential(multiplier=setting("INNER_BACKOFF_BASE_SECONDS")),
-        retry=retry_if_result(lambda verdict: verdict is DeliveryVerdict.RETRY),
+        retry=retry_if_result(lambda outcome: outcome.verdict is DeliveryVerdict.RETRY),
         before_sleep=before_sleep,
         # The caller reads the last outcome rather than catching RetryError.
         # Returning the verdict keeps "ran out of time" and "endpoint said no"

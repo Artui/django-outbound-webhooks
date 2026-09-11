@@ -444,15 +444,15 @@ wheels = [
 
 [[package]]
 name = "django-domain-events"
-version = "0.7.0"
+version = "0.8.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django", version = "5.2.17", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "django", version = "6.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9a/6f/ffcda13c834aa500385996c2d7187bfdaed5586d496f1abc1ad0a9331bd7/django_domain_events-0.7.0.tar.gz", hash = "sha256:dac48c4069e3873e9fbf69c12b7eeefbd899d20c9b0e07fae200e201e5202410", size = 246987, upload-time = "2026-09-05T09:02:34.008Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f0/39/b1b3a0d0aec6a4f288021b666be30983826de6ef0bc3e89e54db683eeae6/django_domain_events-0.8.0.tar.gz", hash = "sha256:62efa95a407b8fc36e55f43ea279c6e1dddef04f35421dfe882b3e842746dd10", size = 254282, upload-time = "2026-09-11T16:03:27.99Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/91/4d/d34a47eaf6bf2f1f3c090d665498eedfa9a8773852d0f38dafc6fc096ed8/django_domain_events-0.7.0-py3-none-any.whl", hash = "sha256:45d296674c4ea965b3c525215f5a5de9cbfb3e0acaa879affef8c212e84aa2e6", size = 88322, upload-time = "2026-09-05T09:02:32.726Z" },
+    { url = "https://files.pythonhosted.org/packages/23/11/18555391264733a39988372a7f4ccc164c6148a415d7b5d4152586a5714b/django_domain_events-0.8.0-py3-none-any.whl", hash = "sha256:2005d6ca75af18f3ec293dddfdb5a0a7f00770bf961017afbee5207dc2a863e0", size = 95326, upload-time = "2026-09-11T16:03:26.639Z" },
 ]
 
 [[package]]
@@ -486,7 +486,7 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "django-domain-events", specifier = ">=0.7.0" },
+    { name = "django-domain-events", specifier = ">=0.8.0" },
     { name = "httpx2", specifier = ">=2.12.0" },
     { name = "standardwebhooks", specifier = ">=1.1.0" },
     { name = "tenacity", specifier = ">=9.1.4" },
