@@ -58,6 +58,10 @@ DEFAULTS: dict[str, Any] = {
     # a request to reach any of those, and a single flag that granted all of it
     # would be one setting away from the worst outcome this package has.
     "ALLOW_PRIVATE_ADDRESSES": False,
+    # How much of an endpoint's response body the log keeps. Enough to read an
+    # error page's first paragraph, not enough for a customer's HTML to become
+    # the largest table in the database.
+    "LOG_BODY_CHARS": 1000,
 }
 
 

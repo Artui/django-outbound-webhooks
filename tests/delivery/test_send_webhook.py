@@ -24,7 +24,9 @@ def _client(handler: object) -> httpx2.Client:
     return httpx2.Client(transport=httpx2.MockTransport(handler))
 
 
-def _send(handler: object, lease_seconds: float = 30.0) -> DeliveryVerdict:
+def _send(
+    handler: object, lease_seconds: float = 30.0, history: list[object] | None = None
+) -> DeliveryVerdict:
     with _client(handler) as client:
         return send_webhook(
             client=client,
@@ -33,7 +35,8 @@ def _send(handler: object, lease_seconds: float = 30.0) -> DeliveryVerdict:
             message_id="msg_1",
             body=BODY,
             lease_seconds=lease_seconds,
-        )
+            history=[] if history is None else history,
+        ).verdict
 
 
 def test_a_2xx_succeeds_on_the_first_attempt() -> None:

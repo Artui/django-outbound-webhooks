@@ -26,6 +26,9 @@ class WebhooksConfig(AppConfig):
         from django_domain_events import receiver
 
         from django_outbound_webhooks.delivery.deliver_due import deliver_due
+        from django_outbound_webhooks.delivery.record_failed_attempts import (
+            record_failed_attempts,
+        )
         from django_outbound_webhooks.delivery.register_fan_out import register_fan_out
         from django_outbound_webhooks.delivery.webhook_delivery_due import WebhookDeliveryDue
         from django_outbound_webhooks.formats.envelope_v1 import EnvelopeV1
@@ -43,6 +46,10 @@ class WebhooksConfig(AppConfig):
             key="django_outbound_webhooks.deliver",
             takes_context=True,
             lease_seconds=setting("DELIVERY_LEASE_SECONDS"),
+            # The other half of the delivery log. A receiver's writes are
+            # discarded when it raises, so the attempts worth recording are the
+            # ones it cannot record; this runs outside that rollback.
+            on_failure=record_failed_attempts,
         )(deliver_due)
 
         register_fan_out()

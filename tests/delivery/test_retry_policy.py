@@ -6,6 +6,7 @@ import pytest
 from tenacity import Retrying, stop_before_delay
 
 from django_outbound_webhooks.delivery.retry_policy import retry_policy
+from django_outbound_webhooks.types.attempt_outcome import AttemptOutcome
 from django_outbound_webhooks.types.delivery_verdict import DeliveryVerdict
 
 
@@ -37,15 +38,16 @@ def test_before_sleep_sees_every_attempt_but_the_last() -> None:
     seen: list[int] = []
     attempts = 0
 
-    def one_attempt() -> DeliveryVerdict:
+    def one_attempt() -> AttemptOutcome:
         nonlocal attempts
         attempts += 1
-        return DeliveryVerdict.SUCCEEDED if attempts > 2 else DeliveryVerdict.RETRY
+        verdict = DeliveryVerdict.SUCCEEDED if attempts > 2 else DeliveryVerdict.RETRY
+        return AttemptOutcome(verdict=verdict, duration_ms=1)
 
     policy = retry_policy(
         lease_seconds=30, before_sleep=lambda state: seen.append(state.attempt_number)
     )
-    assert policy(one_attempt) is DeliveryVerdict.SUCCEEDED
+    assert policy(one_attempt).verdict is DeliveryVerdict.SUCCEEDED
     # Three attempts, two sleeps: the hook runs before a sleep, so the attempt
     # that finally succeeded is not followed by one.
     assert attempts == 3
