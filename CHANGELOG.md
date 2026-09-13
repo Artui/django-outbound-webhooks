@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   than at startup, so without the check the first customer to register one meets
   the error instead of the operator. The likeliest way to reach it is not a typo
   but naming `cloudevents` with no source configured, and the hint says so.
+- Conformance tests taken from the CloudEvents specification rather than from
+  this renderer: the four required attributes, `data` carried as a JSON value
+  rather than a stringified one, no invented member, and a content type copied
+  from the HTTP binding's own structured-mode example. Every other test here
+  compares the format to itself or to its own fixture, which proves agreement
+  and not conformance - the distinction the signing tests already make by
+  verifying against the Standard Webhooks example.
 - `register_built_in_formats`, which publishes both into a registry it is given.
   The argument is what makes the conditional testable: re-running `ready()` to
   reach the unpublished state would also re-register the receivers.

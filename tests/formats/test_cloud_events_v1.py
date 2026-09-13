@@ -142,3 +142,51 @@ def test_the_first_format_renders_what_it_always_did() -> None:
     from tests.format_samples import rendered
 
     assert rendered("envelope-v1.json") == (FIXTURES / "envelope-v1.json").read_bytes()
+
+
+class TestAgainstTheSpecificationRatherThanOurselves:
+    """Conformance claims, each taken from the specification rather than from us.
+
+    Every other test here compares this renderer to itself or to its own
+    fixture, which proves agreement and not conformance -- the same distinction
+    the signing tests make by verifying against the Standard Webhooks example
+    instead of round-tripping our own signer. These are the claims the word
+    "CloudEvents" makes to a consumer, written down where they can go red:
+
+    * the JSON format, on the media type and the shape of ``data``
+      https://github.com/cloudevents/spec/blob/main/cloudevents/formats/json-format.md
+    * the HTTP binding, on the structured-mode content type
+      https://github.com/cloudevents/spec/blob/main/cloudevents/bindings/http-protocol-binding.md
+    """
+
+    #: REQUIRED for every CloudEvent, per the core specification.
+    REQUIRED_ATTRIBUTES = ("specversion", "id", "source", "type")
+
+    def test_every_required_attribute_is_present_and_carries_something(self) -> None:
+        document = json.loads(CloudEventsV1(source=SOURCE).render(**CALL).body)
+        for attribute in self.REQUIRED_ATTRIBUTES:
+            assert document[attribute], f"{attribute} is REQUIRED and must be non-empty"
+
+    def test_the_content_type_is_the_bindings_own_example_string(self) -> None:
+        # Copied from the HTTP binding's structured-mode example rather than
+        # assembled here, down to the spelling of the charset parameter.
+        rendered = CloudEventsV1(source=SOURCE).render(**CALL)
+        assert rendered.content_type == "application/cloudevents+json; charset=UTF-8"
+        assert rendered.content_type.split(";")[0] == "application/cloudevents+json"
+
+    def test_data_is_a_json_value_rather_than_a_string(self) -> None:
+        # The format says data is carried as a JSON value when the content type
+        # declares JSON, and as a string otherwise. Serialising the payload to a
+        # string and putting *that* in `data` is the ordinary way to get this
+        # wrong, and it round-trips through our own parser perfectly well.
+        document = json.loads(CloudEventsV1(source=SOURCE).render(**CALL).body)
+        assert document["datacontenttype"] == "application/json"
+        assert isinstance(document["data"], dict)
+
+    def test_no_attribute_is_invented(self) -> None:
+        # A consumer validating against the spec's schema rejects an unknown
+        # member. Extension attributes are allowed, but an accidental one is not
+        # an extension -- it is a typo that only a strict consumer will find.
+        document = json.loads(CloudEventsV1(source=SOURCE).render(**CALL).body)
+        allowed = {*self.REQUIRED_ATTRIBUTES, "time", "datacontenttype", "data"}
+        assert set(document) <= allowed, f"unknown members: {set(document) - allowed}"

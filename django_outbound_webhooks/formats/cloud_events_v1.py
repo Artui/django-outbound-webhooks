@@ -43,13 +43,15 @@ class CloudEventsV1(BodyFormat):
       consumer knows the document is an event rather than a payload, and this
       is the first thing here to exercise the fact that the content type
       travels with the bytes instead of being fixed by the sender.
-    * ``ensure_ascii`` is **off**, where the envelope has it on. The media type
-      declares ``charset=UTF-8``, and the specification's JSON encoding is
-      UTF-8, so escaping every non-ASCII character to ``\\uXXXX`` would be
-      valid, larger and pointless. It is still pinned rather than left to the
-      default, for the reason the envelope pins it: the bytes are signed and
-      their hash is recorded, so a json module that changed its escaping would
-      change every signature and it would read as a signing bug.
+    * ``ensure_ascii`` is **off**, where the envelope has it on. The content
+      type carries ``charset=UTF-8`` -- which is the HTTP binding's own example
+      rather than a decision taken here -- and JSON exchanged between systems
+      is UTF-8 by RFC 8259 in any case, so escaping every non-ASCII character
+      to ``\\uXXXX`` would be valid, larger and pointless. It is still pinned
+      rather than left to the default, for the reason the envelope pins it: the
+      bytes are signed and their hash is recorded, so a json module that changed
+      its escaping would change every signature and it would read as a signing
+      bug.
 
     The attributes are exactly the ones this package can honestly fill.
     ``subject`` and ``dataschema`` are omitted rather than guessed: both are
