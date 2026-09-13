@@ -152,3 +152,26 @@ def test_end_to_end_a_fired_event_reaches_the_endpoint(
     assert len(no_real_network) == 1
     document = Webhook(SECRET).verify(no_real_network[0].content, dict(no_real_network[0].headers))
     assert document["data"]["order_id"] == 99
+
+
+def test_the_pinned_format_decides_the_body_and_the_content_type(
+    no_real_network: list[httpx2.Request],
+) -> None:
+    """The seam, end to end: a second format changes the wire and nothing else.
+
+    Everything between rendering and sending is format-blind -- the signature
+    is over whatever bytes came back, and the content type travels with them
+    rather than being fixed by the sender. That is easy to write and easy to
+    get wrong in a way only a second format can show, because with one format
+    a hardcoded `application/json` is indistinguishable from a read.
+    """
+    endpoint, source = _endpoint(), _source()
+    deliver_due(_due(endpoint, source, format_name="cloudevents", format_version=1), _Context())
+
+    request = no_real_network[0]
+    assert request.headers["content-type"] == "application/cloudevents+json; charset=UTF-8"
+    document = Webhook(SECRET).verify(request.content, dict(request.headers))
+    assert document["specversion"] == "1.0"
+    assert document["source"] == "https://shop.example/events"
+    assert document["type"] == "testapp.OrderPlaced"
+    assert document["data"]["order_id"] == 7

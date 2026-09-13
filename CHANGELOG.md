@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `CloudEventsV1`, a second published body format: one event as a structured-mode
+  CloudEvent, content type `application/cloudevents+json; charset=UTF-8`. It is
+  the milestone that tests the format seam rather than the one that introduced
+  it, and the seam held - the same `render()` call, no new column on the
+  endpoint, and `envelope@1` renders the byte-identical fixture it was published
+  with.
+- `CLOUDEVENTS_SOURCE`. The format is published only when a deployment says
+  which system produced its events: the specification requires a non-empty
+  `source`, there is nothing in a Django project to derive a meaningful one
+  from, and an invented one would be signed into every body. Unset, `cloudevents`
+  is not a family an endpoint can pin, so the refusal lands at registration and
+  names the families that do exist.
+- `django_outbound_webhooks.W002`, for a `DEFAULT_FORMAT` no published format
+  uses as its family name. That value is read when an endpoint registers rather
+  than at startup, so without the check the first customer to register one meets
+  the error instead of the operator. The likeliest way to reach it is not a typo
+  but naming `cloudevents` with no source configured, and the hint says so.
+- Conformance tests taken from the CloudEvents specification rather than from
+  this renderer: the four required attributes, `data` carried as a JSON value
+  rather than a stringified one, no invented member, and a content type copied
+  from the HTTP binding's own structured-mode example. Every other test here
+  compares the format to itself or to its own fixture, which proves agreement
+  and not conformance - the distinction the signing tests already make by
+  verifying against the Standard Webhooks example.
+- `register_built_in_formats`, which publishes both into a registry it is given.
+  The argument is what makes the conditional testable: re-running `ready()` to
+  reach the unpublished state would also re-register the receivers.
+
+### Changed
+- The CloudEvents format renders with `ensure_ascii` off, where the envelope
+  renders with it on. Both are pinned rather than defaulted, for the same reason
+  - the bytes are signed and their hash is recorded - and they differ because
+  this one's media type declares `charset=UTF-8`, which is the encoding the
+  specification's JSON format uses.
+
+### Fixed
+- The compatibility table in `CLAUDE.md` said the `django-domain-events` floor
+  was 0.7.0 and explained why. 0.1.0 raised it to 0.8.0 for the receiver's
+  `on_failure` hook and left the table and its reasoning behind, which is the
+  form a stale floor claim takes when only the resolver is checked.
+
 ## [0.1.0] — 2026-09-11
 
 ### Added

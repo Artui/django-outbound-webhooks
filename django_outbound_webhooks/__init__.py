@@ -4,6 +4,7 @@ from django_outbound_webhooks.endpoints.endpoints_for import endpoints_for
 from django_outbound_webhooks.endpoints.pinned_format import pinned_format
 from django_outbound_webhooks.endpoints.register_endpoint import register_endpoint
 from django_outbound_webhooks.formats.body_format import BodyFormat
+from django_outbound_webhooks.formats.cloud_events_v1 import CloudEventsV1
 from django_outbound_webhooks.formats.envelope_v1 import EnvelopeV1
 from django_outbound_webhooks.formats.format_registry import FormatRegistry, formats
 from django_outbound_webhooks.signing.sign_request import sign_request
@@ -27,6 +28,7 @@ from django_outbound_webhooks.version import __version__
 
 __all__ = [
     "BodyFormat",
+    "CloudEventsV1",
     "EnvelopeV1",
     "FormatId",
     "FormatRegistry",

@@ -25,7 +25,23 @@ CASES: dict[str, dict[str, Any]] = {
             "total_cents": 19900,
             "currency": "SEK",
         },
-    }
+    },
+    # The same inputs, rendered by the second published format. Identical on
+    # purpose: the two fixtures then differ only where the formats differ, so a
+    # diff between them reads as the shape difference rather than as two
+    # unrelated samples.
+    "cloudevents-v1.json": {
+        "message_id": "msg_2b7f1c9e4a3d4f8e",
+        "event_name": "shop.OrderPlaced",
+        "occurred_at": "2026-09-09T12:34:56.789012+00:00",
+        "payload": {
+            "order_id": 42,
+            "customer": {"name": "Ana Lindström", "vip": True},
+            "coupon": None,
+            "total_cents": 19900,
+            "currency": "SEK",
+        },
+    },
 }
 
 

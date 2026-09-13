@@ -20,6 +20,16 @@ DEFAULTS: dict[str, Any] = {
     # problem one level down, and it is the problem this package exists not to
     # hand its customers.
     "DEFAULT_FORMAT": "envelope",
+    # The CloudEvents `source` attribute: which system produced these events.
+    # None means the CloudEvents format is not published at all, and that is the
+    # honest default rather than a timid one. The specification requires a
+    # non-empty source, there is nothing in a Django project to derive one from
+    # that would mean anything to a consumer, and an invented value would be the
+    # unnamed default this package refuses one level down -- with the added
+    # unpleasantness that it would be *signed*. So: set this and the format is
+    # published; leave it and `cloudevents` is not a family an endpoint can pin,
+    # which register_endpoint refuses by naming the families that do exist.
+    "CLOUDEVENTS_SOURCE": None,
     # Which key in an event's scope names the customer an event belongs to, or
     # None for a deployment that has no such notion.
     #

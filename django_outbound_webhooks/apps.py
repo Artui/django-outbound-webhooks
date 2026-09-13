@@ -31,11 +31,13 @@ class WebhooksConfig(AppConfig):
         )
         from django_outbound_webhooks.delivery.register_fan_out import register_fan_out
         from django_outbound_webhooks.delivery.webhook_delivery_due import WebhookDeliveryDue
-        from django_outbound_webhooks.formats.envelope_v1 import EnvelopeV1
         from django_outbound_webhooks.formats.format_registry import formats
+        from django_outbound_webhooks.formats.register_built_in_formats import (
+            register_built_in_formats,
+        )
         from django_outbound_webhooks.settings import setting
 
-        formats.register(EnvelopeV1())
+        register_built_in_formats(formats)
 
         # The lease is declared here and spent inside send_webhook, from the same
         # setting. Two numbers would be two ways for the receiver's lease and the

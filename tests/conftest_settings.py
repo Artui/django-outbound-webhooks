@@ -34,3 +34,13 @@ DATABASES = {
 }
 
 USE_TZ = True
+
+DJANGO_OUTBOUND_WEBHOOKS = {
+    # Publishes the CloudEvents format for the whole suite, because it is
+    # published only for a deployment that says which system produced its
+    # events. Registration happens once, in AppConfig.ready(), so a test cannot
+    # turn this on afterwards -- which is why register_built_in_formats takes
+    # the registry as an argument: the unpublished half is asserted against a
+    # fresh one instead of by re-running ready().
+    "CLOUDEVENTS_SOURCE": "https://shop.example/events",
+}
