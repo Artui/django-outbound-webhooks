@@ -138,6 +138,20 @@ def _emptied(path: Path, blocks: list[tuple[str, list[str]]], names: set[str]) -
 
 
 def main(argv: list[str]) -> int:
+    if not argv:
+        # A guard that passes when it was asked nothing is worse than no guard,
+        # because somebody reads the exit code as evidence. pre-commit always
+        # passes filenames; a person checking by hand reaches for the bare
+        # command, gets a silent success, and believes it. That happened on
+        # 2026-09-14: this script reported nothing five times in a row against a
+        # file that had a duplicated version heading in it the whole time.
+        print(
+            f"usage: {Path(sys.argv[0]).name} CHANGELOG.md [...]\n"
+            "Refusing to report success without being given a file to check.",
+            file=sys.stderr,
+        )
+        return 2
+
     problems = [problem for name in argv for problem in check(Path(name))]
     for problem in problems:
         print(problem, file=sys.stderr)
