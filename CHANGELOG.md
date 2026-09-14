@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-14
+
+A second body format and the operational surface, released together: both landed
+on `main` before either was published, and one release is the honest way to
+describe what a consumer installs. The plan queued them as separate milestones,
+which is a build order rather than a release schedule - the only numbers that
+mean anything to somebody installing this are the ones below.
+
 ### Added
 - `replay_delivery`, which fires a logged delivery again. A replay is a **new**
   delivery, and everything follows from that: it gets a new `webhook-id`,
@@ -234,5 +242,6 @@ shipped a package that posts to whatever URL a customer types.
   offset and every conforming receiver rejects it as too old or too new, which
   presents as a signature failure carrying a correct signature.
 
-[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.0.0...v0.1.0
