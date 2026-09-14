@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-14
+
+A second body format and the operational surface, released together: both landed
+on `main` before either was published, and one release is the honest way to
+describe what a consumer installs. The plan queued them as separate milestones,
+which is a build order rather than a release schedule - the only numbers that
+mean anything to somebody installing this are the ones below.
+
 ### Added
 - The admin surface: the endpoint registry, the delivery log, replay and
   per-endpoint health, as two ModelAdmins Django's autodiscovery picks up.
