@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The admin surface: the endpoint registry, the delivery log, replay and
+  per-endpoint health, as two ModelAdmins Django's autodiscovery picks up.
+- `EndpointAdmin` shows health in the unit that means something - "3 dead
+  deliveries in a row", never a bare number - links each row to its own
+  attempts rather than counting them, and offers `reactivate` as an action that
+  clears the count with the flag.
+- `DeliveryAttemptAdmin` is read-only, renders both attempt numbers as `3.2` so
+  the tier each counts stays legible, and offers `replay`. Replay is **once per
+  delivery, not once per row**: the log holds a row per HTTP request, so a
+  failed delivery is several rows, and replaying per row would send the
+  customer one webhook per attempt the original made. A refusal is reported and
+  the rest of the selection still goes.
+
+### Security
+- **No signing secret is ever rendered.** Both secret columns are excluded from
+  the endpoint form rather than made read-only, because a read-only field is
+  still displayed: an operator with view access would be reading the credential
+  that authenticates every delivery to that customer, and a support screenshot
+  would carry it out of the building. Rotation stays a library call, which
+  leaves the new secret with the caller rather than on a page.
+- **Endpoints cannot be added through the admin.** `register_endpoint` is where
+  the cross-field rules and the format pinning live; a row created through a
+  form would have no subscriptions, no validated pinning and a secret typed
+  into a browser.
+- **`tenant`, `format_name` and `format_version` are read-only.** The first is
+  the isolation boundary, so editing it in a form moves one customer's endpoint
+  to another customer. The other two are the shape its owner wrote code
+  against.
+- **Both actions declare `permissions=`.** Django offers an action without them
+  to anyone who can reach the changelist, which includes view-only staff, and
+  `has_change_permission` gates the form rather than the action - so refusing
+  there refuses nothing. Replay is gated on the **endpoint's** change
+  permission rather than the log's, because a replay mutates nothing in the log
+  and what it actually does is send a customer a webhook.
+
 ## [0.2.0] — 2026-09-14
 
 A second body format and the operational surface, released together: both landed

@@ -104,8 +104,26 @@ from django_outbound_webhooks.operations.endpoint_disabled import EndpointDisabl
 def email_the_customer(disabled: EndpointDisabled) -> None: ...
 ```
 
+## Admin
+
+Add `django.contrib.admin` and the endpoints and the delivery log are there: per-
+endpoint health in the unit that means something, a link from each endpoint to
+its own attempts, replay as an action on the log, and reactivation as an action
+on the registry.
+
+**No signing secret is ever rendered**, and endpoints cannot be created there -
+`register_endpoint` is where the rules live. `tenant` and the pinned format are
+read-only: the first decides whose payload reaches whose URL, and the other two
+are the shape the customer wrote code against.
+
+Both actions declare their permission, because Django offers an action without
+one to anyone who can open the changelist. Replay is gated on the **endpoint's**
+change permission rather than the log's, so a support user can be given the log
+to read without being able to make deliveries happen.
+
 ## Status
 
 Released and in use, pre-1.0. Shipped: the registry, signing, delivery with a
 lease-bounded retry, the request-forgery policy, the delivery log, two body
-formats, and the operations above. Not yet: the admin surface.
+formats, the operations above and the admin surface. What 1.0 waits on is time
+in production rather than a feature.
