@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] — 2026-09-14
+## [0.3.0] — 2026-09-14
 
-A second body format and the operational surface, released together: both landed
-on `main` before either was published, and one release is the honest way to
-describe what a consumer installs. The plan queued them as separate milestones,
-which is a build order rather than a release schedule - the only numbers that
-mean anything to somebody installing this are the ones below.
+The admin surface, which is the last milestone this package's plan queued.
+
+Its entries spent a few hours filed under `## [0.2.0]`, a version already on
+PyPI without them: the squash merge that landed them duplicated that heading
+rather than conflicting, so nothing failed and the file read as one section with
+two `### Added` blocks. Cutting this release is what surfaced it. The section
+below now reads exactly as 0.2.0 was published.
 
 ### Added
 - The admin surface: the endpoint registry, the delivery log, replay and
@@ -50,6 +52,15 @@ mean anything to somebody installing this are the ones below.
   there refuses nothing. Replay is gated on the **endpoint's** change
   permission rather than the log's, because a replay mutates nothing in the log
   and what it actually does is send a customer a webhook.
+
+### Fixed
+- `scripts/check-changelog` refuses to run with no filenames instead of
+  reporting success. It already looks for a duplicated version heading, which is
+  exactly the damage this release had to repair - and it found it the moment it
+  was handed the file. Every hand-check of it that day had been made without
+  one, so the exit code said nothing five times in a row. A guard that passes
+  when it was asked nothing is worse than no guard, because somebody reads the
+  exit code as evidence.
 
 ## [0.2.0] — 2026-09-14
 
@@ -286,6 +297,7 @@ shipped a package that posts to whatever URL a customer types.
   offset and every conforming receiver rejects it as too old or too new, which
   presents as a signature failure carrying a correct signature.
 
-[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.0.0...v0.1.0
