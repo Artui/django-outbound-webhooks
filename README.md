@@ -69,9 +69,43 @@ registry checks at registration that what you handed it can actually render a
 delivery, because a format is published once at startup and called hours later
 in another process.
 
+## Operations
+
+```python
+from django_outbound_webhooks import reactivate_endpoint, replay_delivery, rotate_secret
+
+replay_delivery(message_id="018f...")  # a new delivery of a logged one
+rotate_secret(endpoint, new_secret=secret)  # both secrets sign until the window closes
+reactivate_endpoint(endpoint)  # back on, and the failure count cleared
+```
+
+A replay is a **new** delivery: a new `webhook-id` (a receiver deduplicates on
+that one), the endpoint's current format and secrets, and its own delivery row,
+attempt budget and log rows. It refuses rather than firing something that cannot
+arrive - a deleted endpoint, an inactive one, an event retention has pruned.
+
+A rotation overlaps. The specification carries several signatures in one header
+and a receiver accepts the delivery if any verifies, so the customer deploys the
+new secret on their own schedule and nothing is dropped in between.
+
+An endpoint that stops answering is switched off after
+`AUTO_DISABLE_AFTER_DEAD_DELIVERIES` consecutive **dead deliveries** - each of
+which has already spent a whole attempt budget across processes and hours, so
+the default of twenty is an endpoint that is gone rather than one having a bad
+afternoon. A delivery that lands resets the count. Somebody has to tell the
+customer, so it fires an event you can receive:
+
+```python
+from django_domain_events import receiver
+from django_outbound_webhooks.operations.endpoint_disabled import EndpointDisabled
+
+
+@receiver(EndpointDisabled, key="acme.email_the_customer")
+def email_the_customer(disabled: EndpointDisabled) -> None: ...
+```
+
 ## Status
 
 Released and in use, pre-1.0. Shipped: the registry, signing, delivery with a
-lease-bounded retry, the request-forgery policy, the delivery log, and two body
-formats. Not yet: replay from the log, secret rotation with overlap,
-auto-disable on sustained failure, and the admin surface.
+lease-bounded retry, the request-forgery policy, the delivery log, two body
+formats, and the operations above. Not yet: the admin surface.

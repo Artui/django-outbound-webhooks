@@ -54,11 +54,15 @@ def test_the_registry_is_left_as_it_was_found() -> None:
     assert check_every_event_has_a_fan_out_receiver(None) == []
 
 
-def test_the_fan_out_event_is_never_reported_as_uncovered() -> None:
-    # It has no fan-out receiver on purpose, so a check that did not exclude it
-    # would warn on every correctly configured project.
+def test_this_packages_own_events_are_never_reported_as_uncovered() -> None:
+    # Neither has a fan-out receiver on purpose, so a check that did not exclude
+    # them would warn on every correctly configured project. Asserting they are
+    # declared first is what stops this passing because the walk found nothing.
     names = {entry.name for entry in registry.events()}
-    assert "django_outbound_webhooks.WebhookDeliveryDue" in names
+    assert {
+        "django_outbound_webhooks.WebhookDeliveryDue",
+        "django_outbound_webhooks.EndpointDisabled",
+    } <= names
     assert check_every_event_has_a_fan_out_receiver(None) == []
 
 

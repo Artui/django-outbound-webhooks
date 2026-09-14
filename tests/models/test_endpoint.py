@@ -53,3 +53,25 @@ def test_a_bare_save_does_not_validate() -> None:
     # Django's ordinary behaviour rather than a surprise.
     _endpoint(url="file:///etc/passwd").save()
     assert Endpoint.objects.count() == 1
+
+
+def test_an_endpoint_that_predates_rotation_and_health_reads_correctly() -> None:
+    # A nullable AddField backfills nothing and a defaulted one backfills its
+    # default, so what an existing row reads after the 0.3.0 migration is
+    # exactly what a row created without these kwargs reads now. Asserting the
+    # second is the closest this suite gets to the first without a migration
+    # harness, and it is the assertion that matters: every one of these has to
+    # say "nothing has happened yet" rather than something that looks like a
+    # rotation or a disabling that never took place.
+    endpoint = Endpoint(
+        name="Acme production",
+        url="https://example.test/hooks",
+        secret=SECRET,
+        format_name="envelope",
+        format_version=1,
+    )
+    assert endpoint.previous_secret == ""
+    assert endpoint.previous_secret_expires_at is None
+    assert endpoint.consecutive_dead_deliveries == 0
+    assert endpoint.disabled_at is None
+    assert endpoint.is_active is True

@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `replay_delivery`, which fires a logged delivery again. A replay is a **new**
+  delivery, and everything follows from that: it gets a new `webhook-id`,
+  because a receiver deduplicates on that one and replaying under the original
+  asks a well-behaved consumer to discard exactly what somebody asked for; it
+  re-reads the endpoint's current pinned format and current secrets, because
+  those are the integration contract as it stands today; and it goes through
+  the substrate, so it has its own delivery row, attempt budget, backoff,
+  dead-lettering and log rows. It refuses rather than firing something that
+  cannot arrive: an unlogged message id, a deleted endpoint, an inactive one,
+  and an event retention has already pruned.
+- `rotate_secret`, and the two columns it writes. The specification carries
+  several signatures in one header and a receiver accepts the delivery if any
+  verifies, which is what lets the two sides move independently: this side
+  rotates now, the customer deploys the new secret on their own schedule, and
+  nothing is dropped in between. `SECRET_ROTATION_OVERLAP_SECONDS` sets the
+  window; passing `overlap_seconds=0` cuts over immediately, which is right for
+  exactly one case - a leaked secret - and wrong for every other.
+- Auto-disable on sustained failure. `AUTO_DISABLE_AFTER_DEAD_DELIVERIES`
+  counts **dead deliveries**, not failed requests: one dead delivery has
+  already spent its whole attempt budget across processes and hours, so the
+  default of twenty in a row is an endpoint that is gone rather than one having
+  a bad afternoon. The same number counted in HTTP requests would fire within
+  minutes. A delivery that lands resets the count, which is what makes the
+  threshold mean *sustained*; `None` turns the feature off and keeps counting.
+- `EndpointDisabled`, fired when that happens. An event rather than a log line
+  because somebody has to tell the customer, and every way of doing that -
+  email, a ticket, a banner - is code in an app this package has never heard
+  of. It is deliberately **not** fanned out to customer endpoints: the endpoint
+  most obviously interested has just been switched off, so a customer
+  subscribed to it would only ever hear about other people's failures.
+- `reactivate_endpoint`, which clears the count along with the flag. An
+  endpoint re-enabled with its count still at the threshold is disabled again
+  by its very next dead delivery, which looks exactly like the re-enabling
+  having silently failed.
 - `CloudEventsV1`, a second published body format: one event as a structured-mode
   CloudEvent, content type `application/cloudevents+json; charset=UTF-8`. It is
   the milestone that tests the format seam rather than the one that introduced
@@ -37,6 +71,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reach the unpublished state would also re-register the receivers.
 
 ### Changed
+- `signing_secrets` now returns the previous secret too while a rotation window
+  is open, newest first. It has returned a list since the first release for
+  this reason, so no call site changed.
+- The endpoint table gains four columns, all of which read correctly on an
+  existing row without a backfill: `previous_secret` blank and
+  `previous_secret_expires_at` null say "never rotated",
+  `consecutive_dead_deliveries` zero says "nothing has failed yet", and
+  `disabled_at` null says "we did not switch this off" - which is how an
+  endpoint an operator deactivated by hand stays distinguishable from one this
+  package disabled.
 - The CloudEvents format renders with `ensure_ascii` off, where the envelope
   renders with it on. Both are pinned rather than defaulted, for the same reason
   - the bytes are signed and their hash is recorded - and they differ because
@@ -44,6 +88,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   specification's JSON format uses.
 
 ### Fixed
+- The package root refuses to re-export either event class, and says why. An
+  `@event` resolves its name through the app registry, so importing one before
+  the apps are loaded raises `AppRegistryNotReady` - and Django imports this
+  package early, on the way to loading the app. A re-export would have made the
+  package unimportable, which is a failure that surfaces nowhere near the line
+  that caused it.
 - The compatibility table in `CLAUDE.md` said the `django-domain-events` floor
   was 0.7.0 and explained why. 0.1.0 raised it to 0.8.0 for the receiver's
   `on_failure` hook and left the table and its reasoning behind, which is the

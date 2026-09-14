@@ -36,3 +36,30 @@ An operator's own format is any object with a `name`, a `version` and a
 `Protocol` -- and the registry verifies at registration that it can actually
 render a delivery, because a format is published once at startup and called
 hours later in another process.
+
+## Operations
+
+`replay_delivery(message_id=...)` fires a logged delivery again. It is a **new**
+delivery rather than a re-run: a new `webhook-id`, because a receiver
+deduplicates on that one; the endpoint's format and secrets as they stand now,
+because those are its integration contract today; and its own delivery row,
+attempt budget, backoff and log rows, because it goes through the substrate like
+everything else. It refuses rather than firing something that cannot arrive - an
+unlogged message id, a deleted endpoint, an inactive one, or an event retention
+has already pruned.
+
+`rotate_secret(endpoint, new_secret=...)` changes a secret without a coordinated
+cutover. Both secrets sign for `SECRET_ROTATION_OVERLAP_SECONDS`, and a receiver
+accepts the delivery if either signature verifies, so the customer deploys the
+new secret on their own schedule. `overlap_seconds=0` cuts over immediately,
+which is right for a leaked secret and wrong for everything else.
+
+Auto-disable switches an endpoint off after
+`AUTO_DISABLE_AFTER_DEAD_DELIVERIES` consecutive **dead deliveries** - the outer
+tier, each already having spent its whole attempt budget - and fires
+`EndpointDisabled` so something in your project can tell the customer. A
+delivery that lands resets the count, which is what makes the threshold mean
+*sustained*. `reactivate_endpoint(endpoint)` puts it back into service and
+clears the count, which has to happen together: an endpoint re-enabled with its
+count still at the threshold is switched off again by its very next dead
+delivery.
