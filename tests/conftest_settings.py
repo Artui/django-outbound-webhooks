@@ -13,6 +13,14 @@ SECRET_KEY = "not-a-secret-this-is-the-test-suite"
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
+    "django.contrib.messages",
+    "django.contrib.sessions",
+    # Installed rather than stubbed. The admin integration is a package named
+    # `admin`, and whether Django's autodiscovery imports it -- and therefore
+    # whether either ModelAdmin is registered at all -- is exactly the thing
+    # worth testing. A ModelAdmin instantiated by hand in a test passes with the
+    # package never loaded.
+    "django.contrib.admin",
     # The substrate ships the event and delivery tables this package's
     # receivers are registered against, so its app has to be installed for
     # either package's models to load.
@@ -25,6 +33,28 @@ INSTALLED_APPS = [
     "django_outbound_webhooks",
     "tests.testapp",
 ]
+
+MIDDLEWARE = [
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+]
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ]
+        },
+    }
+]
+
+ROOT_URLCONF = "tests.urls"
 
 DATABASES = {
     "default": {

@@ -63,3 +63,29 @@ delivery that lands resets the count, which is what makes the threshold mean
 clears the count, which has to happen together: an endpoint re-enabled with its
 count still at the threshold is switched off again by its very next dead
 delivery.
+
+## Admin
+
+Install `django.contrib.admin` and both models appear. The registry page shows
+per-endpoint health in the unit that means something - "3 dead deliveries in a
+row" rather than a bare number - and links each endpoint to its own attempts
+instead of counting them, because the next question is what the last one said.
+The log page is read-only and renders both attempt numbers as `3.2`, so which
+tier each counts stays legible.
+
+Two actions: `reactivate` on the registry, which clears the dead-delivery count
+along with the flag, and `replay` on the log, which sends **once per delivery
+rather than once per row** - a failed delivery is several rows, and replaying
+per row would send the customer one webhook per attempt the original made.
+
+Three refusals are deliberate. No signing secret is ever rendered, on any page.
+Endpoints cannot be created through a form, because `register_endpoint` is where
+the cross-field rules and the format pinning live. And `tenant`, `format_name`
+and `format_version` are read-only: the first is the isolation boundary and the
+other two are the shape the customer integrated against.
+
+Both actions declare `permissions=`, because Django offers an action without one
+to anyone who can reach the changelist - view-only staff included - and
+`has_change_permission` gates the form rather than the action. Replay is gated on
+the *endpoint's* change permission rather than the log's, since a replay mutates
+nothing in the log and what it does is send a customer a webhook.
