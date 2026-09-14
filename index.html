@@ -341,6 +341,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -391,6 +402,17 @@
     <span class="md-ellipsis">
       
         Operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#admin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Admin
       
     </span>
   </a>
@@ -490,6 +512,27 @@ delivery that lands resets the count, which is what makes the threshold mean
 clears the count, which has to happen together: an endpoint re-enabled with its
 count still at the threshold is switched off again by its very next dead
 delivery.</p>
+<h2 id="admin">Admin<a class="headerlink" href="#admin" title="Permanent link">&para;</a></h2>
+<p>Install <code>django.contrib.admin</code> and both models appear. The registry page shows
+per-endpoint health in the unit that means something - "3 dead deliveries in a
+row" rather than a bare number - and links each endpoint to its own attempts
+instead of counting them, because the next question is what the last one said.
+The log page is read-only and renders both attempt numbers as <code>3.2</code>, so which
+tier each counts stays legible.</p>
+<p>Two actions: <code>reactivate</code> on the registry, which clears the dead-delivery count
+along with the flag, and <code>replay</code> on the log, which sends <strong>once per delivery
+rather than once per row</strong> - a failed delivery is several rows, and replaying
+per row would send the customer one webhook per attempt the original made.</p>
+<p>Three refusals are deliberate. No signing secret is ever rendered, on any page.
+Endpoints cannot be created through a form, because <code>register_endpoint</code> is where
+the cross-field rules and the format pinning live. And <code>tenant</code>, <code>format_name</code>
+and <code>format_version</code> are read-only: the first is the isolation boundary and the
+other two are the shape the customer integrated against.</p>
+<p>Both actions declare <code>permissions=</code>, because Django offers an action without one
+to anyone who can reach the changelist - view-only staff included - and
+<code>has_change_permission</code> gates the form rather than the action. Replay is gated on
+the <em>endpoint's</em> change permission rather than the log's, since a replay mutates
+nothing in the log and what it does is send a customer a webhook.</p>
 
 
 
