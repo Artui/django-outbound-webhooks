@@ -68,6 +68,19 @@ DEFAULTS: dict[str, Any] = {
     # a request to reach any of those, and a single flag that granted all of it
     # would be one setting away from the worst outcome this package has.
     "ALLOW_PRIVATE_ADDRESSES": False,
+    # How long an endpoint keeps signing with its previous secret after a
+    # rotation. The window is what makes a rotation uncoordinated: the customer
+    # deploys the new secret on their own schedule and both verify until it
+    # closes. A day is long enough for a customer to notice an email and short
+    # enough that a rotation is over before anyone forgets it happened.
+    "SECRET_ROTATION_OVERLAP_SECONDS": 86400,
+    # How many *consecutive dead deliveries* switch an endpoint off, or None to
+    # never switch one off. The unit is the outer tier: one dead delivery has
+    # already exhausted its whole attempt budget across processes and hours, so
+    # twenty of them in a row is an endpoint that is gone rather than an
+    # endpoint having a bad afternoon. The same number counted in HTTP requests
+    # would fire within minutes.
+    "AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 20,
     # How much of an endpoint's response body the log keeps. Enough to read an
     # error page's first paragraph, not enough for a customer's HTML to become
     # the largest table in the database.

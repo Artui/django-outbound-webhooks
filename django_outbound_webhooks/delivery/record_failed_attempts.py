@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from django_domain_events import DeliveryFailure
+from django_domain_events import DeliveryFailure, DeliveryStatus
 
 from django_outbound_webhooks.delivery.pending_attempts import pending_attempts
 from django_outbound_webhooks.delivery.record_attempts import record_attempts
+from django_outbound_webhooks.operations.note_dead_delivery import note_dead_delivery
 
 logger = logging.getLogger(__name__)
 
@@ -36,5 +37,17 @@ def record_failed_attempts(failure: DeliveryFailure) -> None:
 
     try:
         record_attempts(pending)
+        if failure.status is DeliveryStatus.DEAD:
+            # Only DEAD, and only here. A FAILED delivery will be tried again,
+            # so counting it would measure the substrate's patience rather than
+            # the endpoint's health -- one rotted endpoint would cross any
+            # threshold inside a single delivery's retries.
+            #
+            # Reached only when a request was actually made, which is the right
+            # place for it to be reached: an early return above covers the
+            # deliveries that died without one -- a deleted endpoint, a pruned
+            # event, an unpublished format -- and none of those is evidence
+            # about whether the customer's endpoint is answering.
+            note_dead_delivery(pending.due.endpoint_id)
     finally:
         pending_attempts.set(None)

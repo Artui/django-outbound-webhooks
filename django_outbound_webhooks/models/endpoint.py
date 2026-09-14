@@ -49,7 +49,32 @@ class Endpoint(models.Model):
     #: ``TENANT_SCOPE_KEY``.
     tenant = models.CharField(max_length=255, blank=True, db_index=True)
 
+    #: The secret this endpoint signed with before the last rotation, and the
+    #: moment it stops being offered. Two columns rather than one because a
+    #: rotation without an overlap is a coordinated cutover, which is the thing
+    #: the specification's multi-signature header exists to avoid: the customer
+    #: deploys their new secret whenever they like, and both verify until the
+    #: window closes. ``rotate_secret`` is the only supported writer of either.
+    previous_secret = models.CharField(max_length=255, blank=True)
+    previous_secret_expires_at = models.DateTimeField(null=True, blank=True)
+
+    #: Consecutive deliveries the substrate gave up on, counting the *outer*
+    #: tier: one dead delivery is one webhook that exhausted its whole attempt
+    #: budget, not one failed HTTP request. Reset by the first delivery that
+    #: succeeds. The name says the tier because an auto-disable threshold
+    #: counted in requests would fire orders of magnitude sooner than the same
+    #: number counted in deliveries.
+    consecutive_dead_deliveries = models.PositiveIntegerField(default=0)
+
     is_active = models.BooleanField(default=True)
+
+    #: When this package switched the endpoint off, and null when it did not.
+    #: An operator deactivating an endpoint by hand leaves this null, so the two
+    #: reasons an endpoint is inactive stay distinguishable -- which matters,
+    #: because only one of them should be undone by ``reactivate_endpoint``
+    #: without asking anybody.
+    disabled_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

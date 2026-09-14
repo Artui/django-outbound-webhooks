@@ -28,8 +28,7 @@ def check_every_event_has_a_fan_out_receiver(app_configs: Any, **kwargs: Any) ->
     """
     from django_domain_events import registry
 
-    from django_outbound_webhooks.delivery.register_fan_out import KEY_PREFIX
-    from django_outbound_webhooks.delivery.webhook_delivery_due import WebhookDeliveryDue
+    from django_outbound_webhooks.delivery.register_fan_out import INTERNAL_EVENTS, KEY_PREFIX
 
     covered = {
         entry.key.removeprefix(f"{KEY_PREFIX}.")
@@ -39,7 +38,7 @@ def check_every_event_has_a_fan_out_receiver(app_configs: Any, **kwargs: Any) ->
     missing = sorted(
         entry.name
         for entry in registry.events()
-        if entry.event_class is not WebhookDeliveryDue and entry.name not in covered
+        if entry.event_class not in INTERNAL_EVENTS and entry.name not in covered
     )
     if not missing:
         return []

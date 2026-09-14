@@ -12,6 +12,9 @@ from django_outbound_webhooks.delivery.send_webhook import send_webhook
 from django_outbound_webhooks.delivery.webhook_client import webhook_client
 from django_outbound_webhooks.delivery.webhook_delivery_due import WebhookDeliveryDue
 from django_outbound_webhooks.formats.format_registry import formats
+from django_outbound_webhooks.operations.note_successful_delivery import (
+    note_successful_delivery,
+)
 from django_outbound_webhooks.settings import setting
 from django_outbound_webhooks.signing.signing_secrets import signing_secrets
 from django_outbound_webhooks.types.attempt_outcome import AttemptOutcome
@@ -105,4 +108,9 @@ def deliver_due(due: WebhookDeliveryDue, context: DeliveryContext) -> None:
     # type is optional and this one is not, and asserting it here would be
     # asserting something this function just did.
     record_attempts(pending)
+    # The endpoint answered, so whatever it was doing before does not count
+    # towards auto-disable any more. Inside the receiver rather than beside it:
+    # this write belongs to the same transaction as the log rows, and a reset
+    # that survived a rolled-back delivery would forgive a failure that stood.
+    note_successful_delivery(due.endpoint_id)
     pending_attempts.set(None)

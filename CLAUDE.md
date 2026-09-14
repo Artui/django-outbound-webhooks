@@ -100,9 +100,9 @@ Each of these reads as an oversight and is not.
   explicitly and **fail closed**: an event carrying no tenant scope goes to no
   customer endpoint, never to all of them.
 
-## Two things this package's own conventions collide with
+## Three things this package's own conventions collide with
 
-Both were found by hitting them, and both will recur.
+Each was found by hitting it, and each will recur.
 
 - **A callable Django serialises into a migration must not live at a path the
   package `__init__` shadows.** One-symbol-per-file means a module is named after
@@ -125,6 +125,23 @@ Both were found by hitting them, and both will recur.
   2026-09-11, so a move now needs a migration that rewrites the stored path for
   every install that already ran the old one, and the sentence above no longer
   prices anything at zero.
+- **An `@event` class cannot be imported at module scope by anything the package
+  root re-exports**, for the same reason a model cannot. `@event` resolves the
+  event's name through `apps.get_containing_app_config`, so importing one before
+  the app registry is ready raises `AppRegistryNotReady` - and Django imports
+  this package early, on its way to loading the app. The failure surfaces
+  nowhere near its cause: `makemigrations` dies in the substrate's decorator,
+  with a traceback whose only line in this repository is the `__init__` doing
+  the re-export. So `WebhookDeliveryDue` and `EndpointDisabled` are not
+  re-exported, and `replay_delivery` - which is - imports its event inside the
+  function. A receiver in somebody else's app imports one by leaf path, which is
+  where their code lives anyway.
+
+  The rule is narrower than "never import an event at module scope", and the
+  narrow version is the one to hold: module scope is fine in a module nothing
+  reachable from the root `__init__` imports, which is why `register_fan_out`
+  and `note_dead_delivery` both do it. **Adding a re-export is what breaks it**,
+  and it breaks importing the package rather than the line that was added.
 - **`ty` cannot see a foreign key's implicit `<fk>_id`**, because Django creates
   it at runtime and ty has no Django support. Do not reach for django-stubs, a
   newer ty, a config setting or a different declaration style; all four were

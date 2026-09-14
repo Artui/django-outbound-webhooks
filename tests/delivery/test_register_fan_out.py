@@ -4,8 +4,13 @@ from __future__ import annotations
 
 from django_domain_events import registry
 
-from django_outbound_webhooks.delivery.register_fan_out import KEY_PREFIX, register_fan_out
+from django_outbound_webhooks.delivery.register_fan_out import (
+    INTERNAL_EVENTS,
+    KEY_PREFIX,
+    register_fan_out,
+)
 from django_outbound_webhooks.delivery.webhook_delivery_due import WebhookDeliveryDue
+from django_outbound_webhooks.operations.endpoint_disabled import EndpointDisabled
 
 
 def test_every_declared_event_has_one() -> None:
@@ -19,9 +24,14 @@ def test_every_declared_event_has_one() -> None:
     assert {"testapp.OrderPlaced", "testapp.OrderShipped"} <= covered
 
 
-def test_the_fan_out_event_is_not_fanned_out() -> None:
+def test_this_packages_own_events_are_not_fanned_out() -> None:
+    # Two of them now, for two different reasons: fanning out the fan-out event
+    # is an unbounded write loop, and fanning out EndpointDisabled tells every
+    # customer about somebody else's broken integration.
+    assert set(INTERNAL_EVENTS) == {WebhookDeliveryDue, EndpointDisabled}
     keys = {entry.key for entry in registry.receivers()}
     assert f"{KEY_PREFIX}.django_outbound_webhooks.WebhookDeliveryDue" not in keys
+    assert f"{KEY_PREFIX}.django_outbound_webhooks.EndpointDisabled" not in keys
 
 
 def test_the_keys_are_derived_from_the_event_name() -> None:
@@ -41,4 +51,4 @@ def test_running_it_again_is_harmless() -> None:
 def test_it_reports_what_it_registered() -> None:
     keys = register_fan_out()
     assert f"{KEY_PREFIX}.testapp.OrderPlaced" in keys
-    assert all(WebhookDeliveryDue.__name__ not in key for key in keys)
+    assert all(event.__name__ not in key for key in keys for event in INTERNAL_EVENTS)
