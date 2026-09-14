@@ -50,8 +50,8 @@ Non-negotiable. They keep the package navigable.
    public surface in `__all__`. Internal modules import from leaf paths, never
    from the package's `__init__`.
 7. **The package root is a table of contents, not a drawer.** It holds
-   `__init__.py`, `version.py`, `settings.py`, `apps.py` and nothing else;
-   everything the package does lives in a subpackage. A subpackage is named for
+   `__init__.py`, `version.py`, `settings.py`, `apps.py`, `checks.py` and nothing
+   else; everything the package does lives in a subpackage. A subpackage is named for
    a **concern** (`signing/`, `endpoints/`, `formats/`) and never for a kind of
    thing - `helpers/`, `core/`, `common/` and `misc/` name nothing and become a
    flat root one level down. Three modules on one concern earn a directory.
@@ -118,11 +118,13 @@ Both were found by hitting them, and both will recur.
   nor `endpoints/__init__.py` re-exports its validator either.
 
   **Moving such a module is a cost, not a law, and the owner prices it.** The
-  cost is proportional to installs with history, which for this package is
-  **zero** - nothing has been published and `0001_initial` has never reached
-  `main`. That is why both validators moved into their concern groups on
-  2026-09-10 and the migration was regenerated with them. Once there is a
-  release, the answer changes.
+  cost is proportional to installs with history. It was **zero** on 2026-09-10 -
+  nothing had been published and `0001_initial` had never reached `main` - which
+  is why both validators moved into their concern groups then and the migration
+  was regenerated with them. **That window is closed**: 0.1.0 published on
+  2026-09-11, so a move now needs a migration that rewrites the stored path for
+  every install that already ran the old one, and the sentence above no longer
+  prices anything at zero.
 - **`ty` cannot see a foreign key's implicit `<fk>_id`**, because Django creates
   it at runtime and ty has no Django support. Do not reach for django-stubs, a
   newer ty, a config setting or a different declaration style; all four were
@@ -204,12 +206,20 @@ Django's generated migrations.
 | --- | --- | --- |
 | Python | 3.10 | 3.10 through 3.14 |
 | Django | 4.2 | 4.2, 5.0, 5.1, 5.2, 6.0, 6.1 |
-| django-domain-events | 0.7.0 | the floor job resolves it |
+| django-domain-events | 0.8.0 | the floor job resolves it |
 
-The `django-domain-events` floor is **0.7.0 for a reason**: it is the release
-whose delivery rows carry the lease the inner retry policy is bounded by. Below
-it there is no lease to bound against, and the policy silently becomes the
-unbounded one this package exists to avoid. Do not lower it.
+The `django-domain-events` floor buys two things, and both are load-bearing.
+**0.7.0** is the release whose delivery rows carry the lease the inner retry
+policy is bounded by; below it there is no lease to bound against and the policy
+silently becomes the unbounded one this package exists to avoid. **0.8.0** adds
+the receiver's `on_failure` hook, which is the only way the delivery log records
+a failed attempt - a receiver's writes are discarded when it raises, so without
+it the table holds successes and nothing else. Do not lower it.
+
+This table said **0.7.0** for a day after 0.1.0 raised it, with the paragraph
+below it still explaining the old number. Nothing failed: the resolver reads
+`pyproject.toml` and the floor job resolves what is declared, so a stale claim
+here is invisible until someone believes it.
 
 The suite runs on SQLite throughout. Everything this package owns is
 backend-neutral; the machinery that genuinely needs a real server lives in the

@@ -1,0 +1,1 @@
+{"data":{"coupon":null,"currency":"SEK","customer":{"name":"Ana Lindström","vip":true},"order_id":42,"total_cents":19900},"datacontenttype":"application/json","id":"msg_2b7f1c9e4a3d4f8e","source":"https://shop.example/events","specversion":"1.0","time":"2026-09-09T12:34:56.789012+00:00","type":"shop.OrderPlaced"}

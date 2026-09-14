@@ -69,8 +69,20 @@ def test_an_explicit_version_that_was_never_published_is_refused() -> None:
 
 
 def test_an_unknown_format_family_is_refused() -> None:
-    with pytest.raises(LookupError, match="'cloudevents'"):
-        _register(format_name="cloudevents")
+    # The name here has to be one nothing will ever publish. It used to be
+    # "cloudevents", which was unpublished when this was written and is a
+    # shipped format now -- so the test asserted a refusal that had quietly
+    # become a success, and said so by failing.
+    with pytest.raises(LookupError, match="'stone-tablet'"):
+        _register(format_name="stone-tablet")
+
+
+def test_the_second_built_in_family_can_be_pinned() -> None:
+    # The other half of the same question: an endpoint can select any published
+    # family, and pinning one it did not name a version for records the version
+    # it got.
+    endpoint = _register(format_name="cloudevents")
+    assert (endpoint.format_name, endpoint.format_version) == ("cloudevents", 1)
 
 
 def test_an_invalid_secret_is_refused_and_nothing_is_written() -> None:

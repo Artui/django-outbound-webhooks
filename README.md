@@ -23,6 +23,55 @@ retry, backoff, dead-lettering and replay are inherited rather than rebuilt.
 pip install django-outbound-webhooks
 ```
 
+## Body formats
+
+A customer's endpoint is pinned to one published format *version* when it
+registers, and that version is frozen: changing what it renders would change
+what an already-integrated consumer receives, under a signature that still
+verifies. A change is a new version.
+
+| Family | Content type | Shape |
+| --- | --- | --- |
+| `envelope` | `application/json` | `id`, `type`, `timestamp`, and the payload under `data` |
+| `cloudevents` | `application/cloudevents+json; charset=UTF-8` | CloudEvents 1.0, structured mode |
+
+```python
+register_endpoint(
+    name="Acme production",
+    url="https://acme.example/hooks/orders",
+    secret=secret,
+    event_names=["shop.OrderPlaced"],
+    # Both optional. Without format_name, DEFAULT_FORMAT decides; without
+    # format_version, the latest is pinned and that number is written down.
+    format_name="cloudevents",
+)
+```
+
+`cloudevents` is published only when the deployment says which system produced
+the events, because the specification requires a non-empty `source` and an
+invented one would be signed into every body:
+
+```python
+DJANGO_OUTBOUND_WEBHOOKS = {"CLOUDEVENTS_SOURCE": "https://shop.example/events"}
+```
+
+Your own format is an object with a `name`, a `version` and a `render()`, which
+you publish from your `AppConfig.ready()`:
+
+```python
+from django_outbound_webhooks import formats
+
+formats.register(MyFormat())
+```
+
+It does not have to inherit from anything: `BodyFormat` is a `Protocol`. The
+registry checks at registration that what you handed it can actually render a
+delivery, because a format is published once at startup and called hours later
+in another process.
+
 ## Status
 
-Pre-release scaffold. The first release is 0.1.0.
+Released and in use, pre-1.0. Shipped: the registry, signing, delivery with a
+lease-bounded retry, the request-forgery policy, the delivery log, and two body
+formats. Not yet: replay from the log, secret rotation with overlap,
+auto-disable on sustained failure, and the admin surface.
