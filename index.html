@@ -320,6 +320,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#how-delivery-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How delivery works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#body-formats" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -387,6 +398,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#how-delivery-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How delivery works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#body-formats" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -449,6 +471,15 @@
 Webhooks signing, and per-endpoint delivery built as a durable receiver on
 <a href="https://github.com/Artui/django-domain-events">django-domain-events</a>.</p>
 <p>Your customers subscribe to domain events, not to your <code>post_save</code> signals.</p>
+<h2 id="how-delivery-works">How delivery works<a class="headerlink" href="#how-delivery-works" title="Permanent link">&para;</a></h2>
+<p>One durable receiver is declared for every event, with a <code>targets=</code> callable
+that names the endpoints subscribed to it. The substrate calls it when an event
+is fired, inside the firing transaction, and writes one delivery row per
+endpoint - each carrying the endpoint's pinned format and a <code>webhook-id</code> minted
+for that delivery - so every endpoint has its own attempts, backoff,
+dead-letter and replay. An event nobody subscribes to writes no row. The lookup
+is one indexed query on every event the project fires, and the receiver is
+matched at fire time, so the order of <code>INSTALLED_APPS</code> does not matter.</p>
 <h2 id="body-formats">Body formats<a class="headerlink" href="#body-formats" title="Permanent link">&para;</a></h2>
 <p>An endpoint is pinned to one published format <em>version</em> at registration, and a
 published version is frozen: changing what it renders would change what an
@@ -506,7 +537,11 @@ which is right for a leaked secret and wrong for everything else.</p>
 <p>Auto-disable switches an endpoint off after
 <code>AUTO_DISABLE_AFTER_DEAD_DELIVERIES</code> consecutive <strong>dead deliveries</strong> - the outer
 tier, each already having spent its whole attempt budget - and fires
-<code>EndpointDisabled</code> so something in your project can tell the customer. A
+<code>EndpointDisabled</code> so something in your project can tell the customer. Before
+that, the first dead delivery of an incident fires <code>EndpointFailing</code> - once, and
+also when auto-disable is off - and the delivery that ends it fires
+<code>EndpointRecovered</code>, so a warning sent on the way in has a match on the way out.
+None of the three is delivered to customer endpoints. A
 delivery that lands resets the count, which is what makes the threshold mean
 <em>sustained</em>. <code>reactivate_endpoint(endpoint)</code> puts it back into service and
 clears the count, which has to happen together: an endpoint re-enabled with its
