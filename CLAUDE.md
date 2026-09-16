@@ -222,15 +222,18 @@ Django's generated migrations.
 | --- | --- | --- |
 | Python | 3.10 | 3.10 through 3.14 |
 | Django | 4.2 | 4.2, 5.0, 5.1, 5.2, 6.0, 6.1 |
-| django-domain-events | 0.8.0 | the floor job resolves it |
+| django-domain-events | 0.9.0 | the floor job resolves it |
 
-The `django-domain-events` floor buys two things, and both are load-bearing.
+The `django-domain-events` floor buys three things, and all three are load-bearing.
 **0.7.0** is the release whose delivery rows carry the lease the inner retry
 policy is bounded by; below it there is no lease to bound against and the policy
 silently becomes the unbounded one this package exists to avoid. **0.8.0** adds
 the receiver's `on_failure` hook, which is the only way the delivery log records
 a failed attempt - a receiver's writes are discarded when it raises, so without
-it the table holds successes and nothing else. Do not lower it.
+it the table holds successes and nothing else. **0.9.0** adds the `AnyEvent`
+wildcard receiver and `targets=` fan-out, which delivery is declared on: one
+receiver owes every event, and the callable writes a delivery row per endpoint
+subscribed to it. Do not lower it.
 
 This table said **0.7.0** for a day after 0.1.0 raised it, with the paragraph
 below it still explaining the old number. Nothing failed: the resolver reads
