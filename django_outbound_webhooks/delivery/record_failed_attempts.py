@@ -48,6 +48,6 @@ def record_failed_attempts(failure: DeliveryFailure) -> None:
             # deliveries that died without one -- a deleted endpoint, a pruned
             # event, an unpublished format -- and none of those is evidence
             # about whether the customer's endpoint is answering.
-            note_dead_delivery(pending.due.endpoint_id)
+            note_dead_delivery(pending.target.endpoint_id)
     finally:
         pending_attempts.set(None)

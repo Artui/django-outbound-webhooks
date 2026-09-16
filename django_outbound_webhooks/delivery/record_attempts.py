@@ -20,12 +20,12 @@ def record_attempts(pending: PendingAttempts) -> int:
 
     rows = [
         DeliveryAttempt(
-            message_id=pending.due.message_id,
-            endpoint_id=pending.due.endpoint_id,
+            message_id=pending.target.message_id,
+            endpoint_id=pending.target.endpoint_id,
             url=pending.url,
-            source_event_id=pending.due.source_event_id,
-            format_name=pending.due.format_name,
-            format_version=pending.due.format_version,
+            source_event_id=pending.source_event_id,
+            format_name=pending.target.format_name,
+            format_version=pending.target.format_version,
             outer_attempt=pending.outer_attempt,
             inner_attempt=index,
             request_body_sha256=pending.request_body_sha256,

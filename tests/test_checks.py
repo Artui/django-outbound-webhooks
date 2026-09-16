@@ -2,74 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import pytest
 from django.test import override_settings
-from django_domain_events import event, registry
 
-from django_outbound_webhooks.checks import (
-    check_default_format_is_published,
-    check_every_event_has_a_fan_out_receiver,
-)
-
-
-def test_a_correctly_ordered_project_warns_about_nothing() -> None:
-    assert check_every_event_has_a_fan_out_receiver(None) == []
-
-
-def test_an_uncovered_event_is_reported_with_a_usable_hint() -> None:
-    """The failure this exists for is silent: no endpoint is ever offered the
-    event, a customer who subscribed sees nothing, and nothing raises.
-
-    Declares a real event and never registers a fan-out for it, which is exactly
-    the state an app loading before this package leaves behind. Reaching into
-    the registry's internals to remove a receiver would test the same warning
-    against a state the package cannot actually reach.
-    """
-
-    @event(name="tests.NeverFannedOut")
-    @dataclass(frozen=True)
-    class NeverFannedOut:
-        value: int
-
-    try:
-        warnings = check_every_event_has_a_fan_out_receiver(None)
-    finally:
-        registry._events_by_class.pop(NeverFannedOut, None)
-        registry._events_by_name.pop("tests.NeverFannedOut", None)
-
-    assert len(warnings) == 1
-    assert "tests.NeverFannedOut" in warnings[0].msg
-    assert warnings[0].id == "django_outbound_webhooks.W001"
-    # The hint has to name the actual rule, which is narrower than it looks:
-    # only ordering against the substrate matters, because the substrate is what
-    # autodiscovers every app's events.
-    assert "django_domain_events" in warnings[0].hint
-
-
-def test_the_registry_is_left_as_it_was_found() -> None:
-    # The test above mutates process-wide state, so this is the one that would
-    # notice it leaking into every later test in the session.
-    assert check_every_event_has_a_fan_out_receiver(None) == []
-
-
-def test_this_packages_own_events_are_never_reported_as_uncovered() -> None:
-    # Neither has a fan-out receiver on purpose, so a check that did not exclude
-    # them would warn on every correctly configured project. Asserting they are
-    # declared first is what stops this passing because the walk found nothing.
-    names = {entry.name for entry in registry.events()}
-    assert {
-        "django_outbound_webhooks.WebhookDeliveryDue",
-        "django_outbound_webhooks.EndpointDisabled",
-    } <= names
-    assert check_every_event_has_a_fan_out_receiver(None) == []
-
-
-def test_the_check_is_registered_with_django() -> None:
-    from django.core.checks.registry import registry as check_registry
-
-    assert check_every_event_has_a_fan_out_receiver in check_registry.get_checks()
+from django_outbound_webhooks.checks import check_default_format_is_published
 
 
 @pytest.mark.django_db

@@ -21,16 +21,17 @@ INSTALLED_APPS = [
     # worth testing. A ModelAdmin instantiated by hand in a test passes with the
     # package never loaded.
     "django.contrib.admin",
+    # Deliberately *before* django_domain_events, which is the order that used
+    # to break delivery silently. This package's ready() declares its receiver
+    # before the substrate's ready() has autodiscovered a single events.py, so
+    # every event the suite fires was declared after the receiver existed. The
+    # receiver is a wildcard matched at fire time, and this order is what makes
+    # the whole suite say so rather than one test.
+    "django_outbound_webhooks",
     # The substrate ships the event and delivery tables this package's
     # receivers are registered against, so its app has to be installed for
     # either package's models to load.
     "django_domain_events",
-    # After django_domain_events, and that is the whole ordering rule. The
-    # substrate autodiscovers every app's events.py from its own ready(), so by
-    # the time this package walks the registry every event is in it -- wherever
-    # the app declaring it sits. Put this package first and the registry is
-    # empty when it looks, silently.
-    "django_outbound_webhooks",
     "tests.testapp",
 ]
 

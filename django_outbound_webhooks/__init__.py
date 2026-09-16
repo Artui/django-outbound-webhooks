@@ -29,7 +29,7 @@ from django_outbound_webhooks.version import __version__
 # The same applies to anything else a migration serialises by path -- a
 # `default=` callable, an `upload_to=`, a `through=`.
 #
-# The two event classes are not re-exported either, for an unrelated reason with
+# This package's event classes are not re-exported either, for an unrelated reason with
 # the same shape: `@event` resolves its name through the app registry, so
 # importing one before the apps are loaded raises AppRegistryNotReady -- and
 # this module is imported by Django itself, early, on the way to loading the app.

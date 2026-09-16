@@ -261,8 +261,8 @@ def test_a_failure_before_any_request_logs_nothing(
     _answering(monkeypatch, [200])
 
     # Pin the endpoint to a version nothing published, past register_endpoint's
-    # validation. The fan-out freezes it onto the delivery and the delivery then
-    # fails closed at render time, before any request.
+    # validation. Firing freezes it onto the delivery's target and the delivery
+    # then fails closed at render time, before any request.
     Endpoint.objects.filter(pk=endpoint.pk).update(format_version=9)
     with caplog.at_level(logging.ERROR):
         _fire_and_drain()

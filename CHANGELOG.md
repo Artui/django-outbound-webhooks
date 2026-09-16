@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Delivery is one receiver for every event, with one delivery row per
+  endpoint on the event itself.** It is declared for django-domain-events'
+  `AnyEvent` with a `targets=` callable, which looks up the endpoints subscribed
+  to an event when the event is fired and writes a delivery row per endpoint.
+  Until now each event type had a fan-out receiver of its own, which fired a
+  `WebhookDeliveryDue` event per subscribed endpoint, each delivered by a second
+  receiver. What that changes for a reader of 0.3.0:
+  - the event log no longer carries a `WebhookDeliveryDue` per endpoint, and
+    this package's delivery rows are keyed `django_outbound_webhooks.deliver` on
+    the domain event itself, with the endpoint, its pinned format and the
+    `webhook-id` in the row's `target`;
+  - the endpoint lookup is **one indexed query inside the transaction that fires
+    an event**, on every event fired, where it used to run later in the relay;
+  - the first request goes out one relay pass after the event commits rather
+    than two;
+  - the order of `INSTALLED_APPS` no longer matters. The receiver is matched when
+    an event is fired, so an event declared by an app listed after this package
+    is delivered, where before it silently was not.
+- `replay_delivery` goes through the substrate's `replay_events`, narrowed to the
+  one logged delivery, instead of firing an event of its own. It still sends a
+  new delivery under a new `webhook-id` to the endpoint the log names, with that
+  endpoint's current format and secrets, and it now refuses an event whose class
+  is no longer declared, which the substrate would otherwise skip silently.
+- Replaying a whole event with the substrate's `replay_events` delivers it again
+  to every endpoint subscribed at replay time, each under a new `webhook-id`,
+  and leaves the original deliveries as they were.
+
+### Removed
+- `WebhookDeliveryDue`, the per-event fan-out receivers, and the `W001` system
+  check that warned about an event declared too late to have one - the failure
+  it reported can no longer happen.
+- A delivery's refusal of a source event pruned before it was sent. The delivery
+  row now belongs to the event it delivers, and the substrate never prunes an
+  event with a delivery still owed.
+
 ## [0.3.0] — 2026-09-14
 
 The admin surface, which is the last milestone this package's plan queued.

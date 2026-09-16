@@ -1,4 +1,4 @@
-"""Replaying a logged delivery, and the four things that stop one."""
+"""Replaying a logged delivery, and the five things that stop one."""
 
 from __future__ import annotations
 
@@ -7,10 +7,13 @@ import base64
 import httpx2
 import pytest
 from django.db import transaction
-from django_domain_events import drain_outbox, fire
+from django_domain_events import drain_outbox, fire, receiver, registry, replay_events
+from django_domain_events.models.delivery_record import DeliveryRecord
 from django_domain_events.models.event_record import EventRecord
 from standardwebhooks import Webhook
 
+from django_outbound_webhooks.delivery.deliver_due import RECEIVER_KEY
+from django_outbound_webhooks.delivery.replay_target import replay_target
 from django_outbound_webhooks.endpoints.register_endpoint import register_endpoint
 from django_outbound_webhooks.models.delivery_attempt import DeliveryAttempt
 from django_outbound_webhooks.models.endpoint import Endpoint
@@ -35,11 +38,10 @@ def _endpoint(**overrides: object) -> Endpoint:
 
 
 def _deliver_once() -> tuple[Endpoint, str]:
-    """Fan out and deliver one event, and return the endpoint and message id."""
+    """Fire and deliver one event, and return the endpoint and message id."""
     endpoint = _endpoint()
     with transaction.atomic():
         fire(OrderPlaced(order_id=7, total_cents=2500))
-    drain_outbox()
     drain_outbox()
     attempt = DeliveryAttempt.objects.get()
     return endpoint, attempt.message_id
@@ -113,8 +115,12 @@ def test_the_replay_gets_its_own_log_rows(no_real_network: list[httpx2.Request])
     # row, attempt budget and log rows rather than appending to the original's.
     _, original = _deliver_once()
     replayed = replay_delivery(message_id=original)
-    drain_outbox()
 
+    rows = DeliveryRecord.objects.filter(receiver_key=RECEIVER_KEY).order_by("pk")
+    assert [(row.status, row.attempts) for row in rows] == [("succeeded", 1), ("pending", 0)]
+    assert rows[0].event_id == rows[1].event_id, "the same event, owed again"
+
+    drain_outbox()
     assert DeliveryAttempt.objects.filter(message_id=original).count() == 1
     assert DeliveryAttempt.objects.filter(message_id=replayed).count() == 1
 
@@ -165,3 +171,104 @@ def test_nothing_is_posted_before_the_relay_runs(
     _, original = _deliver_once()
     replay_delivery(message_id=original)
     assert len(no_real_network) == 1
+
+
+def test_it_goes_only_to_the_endpoint_the_log_names(
+    no_real_network: list[httpx2.Request],
+) -> None:
+    """Replaying one delivery is not replaying the event.
+
+    A second endpoint subscribed to the same event is exactly what the substrate
+    would re-derive if nothing narrowed it, so this is sized to tell the two
+    apart: one new row, for the logged endpoint, and one new request.
+    """
+    endpoint, original = _deliver_once()
+    _endpoint(name="Globex", url="https://other.test/hooks")
+
+    replay_delivery(message_id=original)
+    drain_outbox()
+
+    rows = DeliveryRecord.objects.filter(receiver_key=RECEIVER_KEY)
+    assert rows.count() == 2
+    assert [request.url.host for request in no_real_network] == ["example.test", "example.test"]
+    assert DeliveryAttempt.objects.filter(endpoint=endpoint).count() == 2
+
+
+def test_the_narrowing_ends_with_the_call(no_real_network: list[httpx2.Request]) -> None:
+    _, original = _deliver_once()
+    replay_delivery(message_id=original)
+    assert replay_target.get() is None
+
+
+def test_the_narrowing_ends_even_when_the_replay_raises(
+    monkeypatch: pytest.MonkeyPatch, no_real_network: list[httpx2.Request]
+) -> None:
+    """A narrowing that outlived a failed call would steer the next replay in
+    this context to the wrong endpoint."""
+    _, original = _deliver_once()
+
+    def broken(*args: object, **kwargs: object) -> dict[str, int]:
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr("django_outbound_webhooks.operations.replay_delivery.replay_events", broken)
+    with pytest.raises(RuntimeError, match="went away"):
+        replay_delivery(message_id=original)
+    assert replay_target.get() is None
+
+
+def test_an_event_that_is_no_longer_declared_is_refused(
+    no_real_network: list[httpx2.Request],
+) -> None:
+    """The substrate skips an event it cannot rebuild without saying so, so an
+    operator would be told a replay happened when nothing was written."""
+    _, original = _deliver_once()
+    EventRecord.objects.filter(name="testapp.OrderPlaced").update(name="testapp.Renamed")
+
+    with pytest.raises(ReplayRefused, match="no longer declared"):
+        replay_delivery(message_id=original)
+    assert DeliveryRecord.objects.filter(receiver_key=RECEIVER_KEY).count() == 1
+
+
+def test_replaying_the_whole_event_goes_to_every_endpoint_subscribed_now(
+    no_real_network: list[httpx2.Request],
+) -> None:
+    """The substrate's own replay, with nothing narrowing it.
+
+    It asks the receiver for its targets again, so an endpoint registered after
+    the event was fired receives it, under a new message id, and the original
+    delivery is left as it was rather than reopened.
+    """
+    _, original = _deliver_once()
+    _endpoint(name="Globex", url="https://other.test/hooks")
+    event_id = EventRecord.objects.get(name="testapp.OrderPlaced").pk
+
+    assert replay_events([event_id]) == {"reopened": 0, "added": 2}
+    drain_outbox()
+
+    hosts = sorted(request.url.host for request in no_real_network[1:])
+    assert hosts == ["example.test", "other.test"]
+    assert original not in {request.headers["webhook-id"] for request in no_real_network[1:]}
+    assert registry.receiver_for_key(RECEIVER_KEY) is not None
+
+
+def test_it_reopens_nothing_that_belongs_to_another_receiver(
+    no_real_network: list[httpx2.Request],
+) -> None:
+    """A delivery replay is this package's business alone.
+
+    A project's own durable receiver on the same event has a settled row of its
+    own. Replaying one webhook must not hand that receiver the event again, so
+    the substrate replay is narrowed to this package's key - and this is the
+    test that can see the difference, because it gives the event a second
+    receiver to disturb.
+    """
+    receiver(OrderPlaced, key="tests.audit")(lambda event: None)
+    try:
+        _, original = _deliver_once()
+        assert DeliveryRecord.objects.get(receiver_key="tests.audit").status == "succeeded"
+
+        replay_delivery(message_id=original)
+
+        assert DeliveryRecord.objects.get(receiver_key="tests.audit").status == "succeeded"
+    finally:
+        registry._receivers.pop("tests.audit", None)
