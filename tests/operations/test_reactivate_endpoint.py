@@ -7,6 +7,7 @@ import base64
 import pytest
 from django.test import override_settings
 from django.utils import timezone
+from django_domain_events.models.event_record import EventRecord
 
 from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.operations.note_dead_delivery import note_dead_delivery
@@ -75,3 +76,15 @@ def test_it_survives_a_reload() -> None:
         None,
         0,
     )
+
+
+def test_switching_it_back_on_is_not_a_recovery() -> None:
+    """Somebody deciding an endpoint deserves another chance is not evidence it
+    answers, so no EndpointRecovered; the first delivery that lands is."""
+    endpoint = _endpoint(
+        is_active=False, disabled_at=timezone.now(), consecutive_dead_deliveries=20
+    )
+    reactivate_endpoint(endpoint)
+    assert not EventRecord.objects.filter(
+        name="django_outbound_webhooks.EndpointRecovered"
+    ).exists()

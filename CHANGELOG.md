@@ -17,6 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so an endpoint refusing forever dead-letters as before, and the substrate caps
   the wait at its `MAX_RECEIVER_RETRY_DELAY_SECONDS`. A header that cannot be read,
   or one on any other status, is ignored.
+- **`EndpointFailing`, fired on an endpoint's first dead delivery of an
+  incident**, and **`EndpointRecovered`, fired on the delivery that ends it.**
+  Until now the first word about a failing endpoint was `EndpointDisabled`, by
+  which point it was already off, and with `AUTO_DISABLE_AFTER_DEAD_DELIVERIES`
+  set to `None` there was no word at all. `EndpointFailing` fires when the count
+  of consecutive dead deliveries goes from zero to one - once per incident, in
+  every configuration including `None` - and carries the endpoint's id, its name
+  and the threshold that will switch it off. `EndpointRecovered` fires when a
+  delivery resets that count, carrying the id and name, and costs no extra read:
+  it rides on the reset's own conditional update. Both edges are decided by the
+  database, so deliveries dying or landing together in parallel workers announce
+  an incident once. Neither is ever delivered to a customer endpoint, like
+  `EndpointDisabled`, and `reactivate_endpoint` fires neither. No new setting.
 
 ### Changed
 - **Delivery is one receiver for every event, with one delivery row per

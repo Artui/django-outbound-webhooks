@@ -10,6 +10,7 @@ from django.utils import timezone
 from django_domain_events import fire
 
 from django_outbound_webhooks.operations.endpoint_disabled import EndpointDisabled
+from django_outbound_webhooks.operations.endpoint_failing import EndpointFailing
 from django_outbound_webhooks.settings import setting
 
 logger = logging.getLogger(__name__)
@@ -17,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 def note_dead_delivery(endpoint_id: int) -> bool:
     """Record one dead delivery against an endpoint; return whether that ended it.
+
+    The first dead delivery of an incident - the count going from zero to one -
+    also fires ``EndpointFailing``, whatever the threshold and even when there
+    is none, since that configuration is the one where the warning is the only
+    signal anybody gets.
 
     Called only for ``DEAD``, never for ``FAILED``. A failed delivery will be
     tried again, so counting it would measure how patient the substrate's
@@ -33,6 +39,13 @@ def note_dead_delivery(endpoint_id: int) -> bool:
     deliveries against an already-disabled endpoint keep counting and return
     False, because the count is what an operator reads to decide whether it is
     worth re-enabling.
+
+    **The zero-to-one edge is decided by the database, not by this process.** It
+    is its own update, conditioned on the count being zero, tried before the
+    increment: of several deliveries dying together in parallel workers exactly
+    one can match it, because the others block on the row and find the count
+    already one when they re-read it. A read of the count followed by a decision
+    here would let two of them see zero and warn twice.
     """
     threshold = setting("AUTO_DISABLE_AFTER_DEAD_DELIVERIES")
 
@@ -50,19 +63,40 @@ def note_dead_delivery(endpoint_id: int) -> bool:
     # EndpointDisabled that committed while the endpoint stayed active would be
     # a durable record of something that never happened.
     with transaction.atomic():
-        updated = Endpoint.objects.filter(pk=endpoint_id).update(
-            consecutive_dead_deliveries=F("consecutive_dead_deliveries") + 1
+        started_failing = bool(
+            Endpoint.objects.filter(pk=endpoint_id, consecutive_dead_deliveries=0).update(
+                consecutive_dead_deliveries=1
+            )
         )
-        if not updated:
+        # The increment only when the edge did not match: that update already
+        # counted this delivery, and counting it twice would put the endpoint a
+        # dead delivery closer to being switched off than it is.
+        if not started_failing and not Endpoint.objects.filter(pk=endpoint_id).update(
+            consecutive_dead_deliveries=F("consecutive_dead_deliveries") + 1
+        ):
             # Deleted between the delivery and this hook. Nothing to disable and
             # nothing owed: the customer removed the destination themselves.
             return False
 
-        if threshold is None:
+        if threshold is None and not started_failing:
+            # The ordinary case with auto-disable off costs no read at all.
             return False
 
         endpoint = Endpoint.objects.get(pk=endpoint_id)
-        if not endpoint.is_active or endpoint.consecutive_dead_deliveries < threshold:
+        if started_failing:
+            fire(
+                EndpointFailing(
+                    endpoint_id=endpoint.pk,
+                    endpoint_name=endpoint.name,
+                    disabled_after_dead_deliveries=threshold,
+                )
+            )
+
+        if (
+            threshold is None
+            or not endpoint.is_active
+            or endpoint.consecutive_dead_deliveries < threshold
+        ):
             return False
 
         endpoint.is_active = False

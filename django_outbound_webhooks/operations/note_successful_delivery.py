@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 
-def note_successful_delivery(endpoint_id: int) -> None:
-    """Reset the dead-delivery count after a delivery lands.
+from django_domain_events import fire
+
+if TYPE_CHECKING:
+    from django_outbound_webhooks.models.endpoint import Endpoint
+
+
+def note_successful_delivery(endpoint: Endpoint) -> None:
+    """Reset the dead-delivery count after a delivery lands, and say so if it was failing.
 
     "Sustained" is the whole content of auto-disable: an endpoint that fails
     nineteen times over a month and succeeds in between is a flaky network, and
@@ -19,16 +26,29 @@ def note_successful_delivery(endpoint_id: int) -> None:
     make the decision in this process and leave room for another worker to
     change the answer in between. The first draft of this docstring claimed the
     ordinary case cost nothing at all, and the test below is what disagreed.
-    """
-    # Inside the function, like every model import in this package. Django
-    # imports an app's package before the app registry is ready, so a
-    # module-scope model import anywhere reachable from the package root raises
-    # AppRegistryNotReady. This module is not re-exported today, which makes the
-    # rule look optional here -- it is not: keeping it uniform is what stops a
-    # re-export added later from breaking the package's importability, which is
-    # a failure that surfaces nowhere near the line that caused it.
-    from django_outbound_webhooks.models.endpoint import Endpoint
 
-    Endpoint.objects.filter(pk=endpoint_id, consecutive_dead_deliveries__gt=0).update(
+    **That same update is what decides ``EndpointRecovered``.** It matches a row
+    only when the endpoint was failing, so the number of rows it changed is the
+    answer, and among several deliveries landing together exactly one can
+    change it. The event is fired from that answer with no read: the endpoint is
+    handed in by the delivery, which loaded it to send the request.
+
+    Called inside the delivery's transaction, where ``fire()`` expects to be, so
+    a delivery rolled back because its worker lost the row takes the reset and
+    the event with it.
+    """
+    # Both inside the function, and neither is optional. Django imports an app's
+    # package before the app registry is ready, and this module *is* reachable
+    # from the package root - through replay_delivery, which is re-exported and
+    # imports the delivery receiver's module for its key. A model imported at
+    # module scope raises AppRegistryNotReady there, and so does an event class,
+    # because @event resolves its name through the app registry. Hoisting the
+    # event import was tried, and `manage.py check` died on it.
+    from django_outbound_webhooks.models.endpoint import Endpoint
+    from django_outbound_webhooks.operations.endpoint_recovered import EndpointRecovered
+
+    recovered = Endpoint.objects.filter(pk=endpoint.pk, consecutive_dead_deliveries__gt=0).update(
         consecutive_dead_deliveries=0
     )
+    if recovered:
+        fire(EndpointRecovered(endpoint_id=endpoint.pk, endpoint_name=endpoint.name))
