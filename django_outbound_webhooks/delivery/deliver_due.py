@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 
-from django_domain_events import DeliveryContext
+from django_domain_events import DeliveryContext, RetryAfter
 
 from django_outbound_webhooks.delivery.pending_attempts import PendingAttempts, pending_attempts
 from django_outbound_webhooks.delivery.record_attempts import record_attempts
@@ -106,6 +106,19 @@ def deliver_due(event: object, context: DeliveryContext) -> None:
     if final.verdict is not DeliveryVerdict.SUCCEEDED:
         # The log is written by the failure hook instead, from outside the
         # transaction this raise is about to roll back.
+        if final.retry_after_seconds is not None:
+            # The endpoint named a time, so the substrate schedules the next
+            # outer attempt for it instead of guessing on its backoff curve. It
+            # still counts as an attempt, so an endpoint refusing forever still
+            # dead-letters within the budget, and the substrate caps the wait.
+            raise RetryAfter(
+                seconds=final.retry_after_seconds,
+                reason=(
+                    f"Delivery {target.message_id} to endpoint {target.endpoint_id} came back "
+                    f"{final.status_code} on outer attempt {context.attempt}, asking to be "
+                    f"retried in {final.retry_after_seconds:g}s."
+                ),
+            )
         raise DeliveryFailed(
             f"Delivery {target.message_id} to endpoint {target.endpoint_id} came back "
             f"{final.verdict.value} on outer attempt {context.attempt} after "

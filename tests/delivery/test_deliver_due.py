@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import base64
+from datetime import datetime, timedelta, timezone
 
 import httpx2
 import pytest
 from django.db import transaction
-from django_domain_events import DeliveryContext, drain_outbox, fire
+from django_domain_events import DeliveryContext, RetryAfter, drain_outbox, fire
+from django_domain_events.models.delivery_record import DeliveryRecord
 from django_domain_events.models.event_record import EventRecord
 from standardwebhooks import Webhook
 
-from django_outbound_webhooks.delivery.deliver_due import DeliveryFailed, deliver_due
+from django_outbound_webhooks.delivery.deliver_due import RECEIVER_KEY, DeliveryFailed, deliver_due
 from django_outbound_webhooks.endpoints.register_endpoint import register_endpoint
+from django_outbound_webhooks.models.delivery_attempt import DeliveryAttempt
 from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.types.delivery_target import DeliveryTarget
 from tests.testapp.events import OrderPlaced
@@ -161,3 +164,56 @@ def test_the_pinned_format_decides_the_body_and_the_content_type(
     assert document["source"] == "https://shop.example/events"
     assert document["type"] == "testapp.OrderPlaced"
     assert document["data"]["order_id"] == 7
+
+
+def _rate_limited(monkeypatch: pytest.MonkeyPatch, retry_after: str) -> list[httpx2.Request]:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(429, headers={"Retry-After": retry_after}, text="slow down")
+
+    monkeypatch.setattr(
+        "django_outbound_webhooks.delivery.deliver_due.webhook_client",
+        lambda: httpx2.Client(transport=httpx2.MockTransport(handler)),
+    )
+    return seen
+
+
+def test_a_retry_after_is_handed_to_the_substrate_as_its_schedule(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _rate_limited(monkeypatch, "120")
+    endpoint, source = _endpoint(), _source()
+
+    with pytest.raises(RetryAfter) as raised:
+        deliver_due(EVENT, _context(endpoint, source))
+
+    assert raised.value.seconds == 120.0
+    assert "came back 429" in str(raised.value)
+    assert "retried in 120s" in str(raised.value)
+
+
+def test_end_to_end_the_next_outer_attempt_is_when_the_endpoint_asked(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The rows, not the exception: one request, one attempt counted, the
+    delivery scheduled two minutes out rather than on the backoff curve, and the
+    refusal in the log."""
+    seen = _rate_limited(monkeypatch, "120")
+    _endpoint()
+    with transaction.atomic():
+        fire(OrderPlaced(order_id=5, total_cents=100))
+
+    before = datetime.now(timezone.utc)
+    drain_outbox(respect_backoff=True)
+    after = datetime.now(timezone.utc)
+
+    assert len(seen) == 1
+    row = DeliveryRecord.objects.get(receiver_key=RECEIVER_KEY)
+    assert (row.status, row.attempts) == ("failed", 1)
+    assert before + timedelta(seconds=120) <= row.available_at <= after + timedelta(seconds=120)
+    assert row.last_error.startswith("RetryAfter: ")
+
+    [logged] = DeliveryAttempt.objects.all()
+    assert (logged.response_status, logged.verdict, logged.outer_attempt) == (429, "retry", 1)

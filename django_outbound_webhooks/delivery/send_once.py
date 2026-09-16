@@ -8,6 +8,10 @@ from datetime import datetime, timezone
 import httpx2
 
 from django_outbound_webhooks.delivery.classify_response import classify_response
+from django_outbound_webhooks.delivery.retry_after_seconds import (
+    HONOURED_STATUSES,
+    retry_after_seconds,
+)
 from django_outbound_webhooks.settings import setting
 from django_outbound_webhooks.signing.sign_request import sign_request
 from django_outbound_webhooks.types.attempt_outcome import AttemptOutcome
@@ -68,6 +72,13 @@ def send_once(
         duration_ms=_elapsed_ms(started),
         status_code=response.status_code,
         response_body=response.text[: setting("LOG_BODY_CHARS")],
+        retry_after_seconds=(
+            retry_after_seconds(
+                response.headers.get("retry-after"), now=datetime.now(tz=timezone.utc)
+            )
+            if response.status_code in HONOURED_STATUSES
+            else None
+        ),
     )
 
 
