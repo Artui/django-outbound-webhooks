@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-16
+
+Delivery rebuilt on django-domain-events 0.9.0, which grew the wildcard
+receivers, per-target delivery rows and receiver-set retry times this package
+asked for. It needs that release: `AnyEvent`, `targets=` and `RetryAfter` do not
+exist before it.
+
 ### Added
 - **An endpoint's `Retry-After` is honoured.** A `429` or `503` carrying the
   header, in either of its forms, ends the in-lease retry after that one request
@@ -357,7 +364,8 @@ shipped a package that posts to whatever URL a customer types.
   offset and every conforming receiver rejects it as too old or too new, which
   presents as a signature failure carrying a correct signature.
 
-[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.0.0...v0.1.0
