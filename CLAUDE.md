@@ -132,9 +132,11 @@ Each was found by hitting it, and each will recur.
   this package early, on its way to loading the app. The failure surfaces
   nowhere near its cause: `makemigrations` dies in the substrate's decorator,
   with a traceback whose only line in this repository is the `__init__` doing
-  the re-export. So `EndpointDisabled` is not re-exported, and nothing the root
-  reaches imports it at module scope. A receiver in somebody else's app imports
-  one by leaf path, which is where their code lives anyway.
+  the re-export. So `EndpointDisabled`, `EndpointFailing` and `EndpointRecovered`
+  are not re-exported, and `note_successful_delivery` - which the root reaches
+  through `replay_delivery` importing the delivery receiver's module for its key -
+  imports `EndpointRecovered` inside the function. A receiver in somebody else's
+  app imports one by leaf path, which is where their code lives anyway.
 
   The rule is narrower than "never import an event at module scope", and the
   narrow version is the one to hold: module scope is fine in a module nothing
