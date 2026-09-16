@@ -10,6 +10,7 @@ import pytest
 from standardwebhooks import Webhook
 
 from django_outbound_webhooks.delivery.send_webhook import send_webhook
+from django_outbound_webhooks.types.attempt_outcome import AttemptOutcome
 from django_outbound_webhooks.types.delivery_verdict import DeliveryVerdict
 from django_outbound_webhooks.types.rendered_body import RenderedBody
 
@@ -201,3 +202,66 @@ def test_a_slow_attempt_cannot_push_the_run_past_the_lease(settings: object) -> 
         f"An attempt was started that could not finish in time, which is how a POST is sent "
         f"and the write recording it is rolled back by another worker."
     )
+
+
+def _answering(status: int, headers: dict[str, str]) -> tuple[list[httpx2.Request], object]:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(status, headers=headers)
+
+    return seen, handler
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_a_retry_after_ends_the_inner_tier_and_carries_the_time(status: int) -> None:
+    """The endpoint named a time, and it can be minutes past the lease, so the
+    wait belongs to the outer tier. Another request inside the lease would be
+    arriving early at a rate limiter."""
+    seen, handler = _answering(status, {"Retry-After": "120"})
+    history: list[AttemptOutcome] = []
+
+    assert _send(handler, history=history) is DeliveryVerdict.RETRY
+    assert len(seen) == 1
+    assert [outcome.retry_after_seconds for outcome in history] == [120.0]
+
+
+def test_without_the_header_a_429_is_retried_inside_the_lease_as_before(settings: object) -> None:
+    settings.DJANGO_OUTBOUND_WEBHOOKS = {
+        "TIMEOUT_SECONDS": 0.5,
+        "LEASE_MARGIN_SECONDS": 0.2,
+        "INNER_BACKOFF_BASE_SECONDS": 0.01,
+    }
+    seen, handler = _answering(429, {})
+    history: list[AttemptOutcome] = []
+
+    _send(handler, lease_seconds=1.5, history=history)
+
+    assert len(seen) > 1
+    assert {outcome.retry_after_seconds for outcome in history} == {None}
+
+
+def test_a_retry_after_on_any_other_status_is_not_an_instruction(settings: object) -> None:
+    """Sized so the status gate is what answers: the header is present and
+    readable, and a 500 is retryable, so only the gate can leave it unread."""
+    settings.DJANGO_OUTBOUND_WEBHOOKS = {
+        "TIMEOUT_SECONDS": 0.5,
+        "LEASE_MARGIN_SECONDS": 0.2,
+        "INNER_BACKOFF_BASE_SECONDS": 0.01,
+    }
+    seen, handler = _answering(500, {"Retry-After": "120"})
+    history: list[AttemptOutcome] = []
+
+    _send(handler, lease_seconds=1.5, history=history)
+
+    assert len(seen) > 1
+    assert {outcome.retry_after_seconds for outcome in history} == {None}
+
+
+def test_a_permanent_refusal_carrying_the_header_still_stops_as_permanent() -> None:
+    seen, handler = _answering(410, {"Retry-After": "120"})
+    history: list[AttemptOutcome] = []
+
+    assert _send(handler, history=history) is DeliveryVerdict.PERMANENT
+    assert history[0].retry_after_seconds is None

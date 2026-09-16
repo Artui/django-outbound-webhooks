@@ -33,6 +33,11 @@ every endpoint has its own attempt count, backoff, dead-letter and replay, and a
 rotted endpoint cannot drag the others through its retries. An event nobody
 subscribes to writes no delivery row at all.
 
+An endpoint answering `429` or `503` with `Retry-After` is taken at its word:
+that delivery stops retrying inside its lease and its next attempt is scheduled
+for the time the endpoint named, which still counts against the delivery's
+attempt budget.
+
 Two things follow from where the lookup runs. It is **one indexed query in the
 transaction that fires the event**, on every event your project fires. And it
 does not depend on the order of `INSTALLED_APPS`: the receiver is matched when an

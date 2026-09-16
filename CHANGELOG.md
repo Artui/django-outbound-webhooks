@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **An endpoint's `Retry-After` is honoured.** A `429` or `503` carrying the
+  header, in either of its forms, ends the in-lease retry after that one request
+  and schedules the delivery's next attempt for the time the endpoint asked, through
+  django-domain-events' `RetryAfter`, instead of retrying sooner inside the
+  lease or waiting on the backoff curve. The wait is outer-tier because it can
+  be minutes past the lease. It still consumes one of the delivery's attempts,
+  so an endpoint refusing forever dead-letters as before, and the substrate caps
+  the wait at its `MAX_RECEIVER_RETRY_DELAY_SECONDS`. A header that cannot be read,
+  or one on any other status, is ignored.
+
 ### Changed
 - **Delivery is one receiver for every event, with one delivery row per
   endpoint on the event itself.** It is declared for django-domain-events'

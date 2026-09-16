@@ -36,6 +36,12 @@ def retry_policy(
     substrate can only retry what raises, which is why it retries everything to
     the attempt budget and no receiver can say `410 Gone` is permanent. Here a
     permanent verdict simply stops.
+
+    So does an answer carrying ``Retry-After``. The endpoint has said when it
+    will be ready, and that time can be minutes past the lease, so honouring it
+    is the outer tier's job: the delivery ends here and the substrate schedules
+    the next attempt for when it was asked. Retrying sooner inside the lease
+    would be arriving early at a rate limiter, which only earns another refusal.
     """
     return Retrying(
         stop=stop_before_delay(
@@ -46,7 +52,11 @@ def retry_policy(
             )
         ),
         wait=wait_exponential(multiplier=setting("INNER_BACKOFF_BASE_SECONDS")),
-        retry=retry_if_result(lambda outcome: outcome.verdict is DeliveryVerdict.RETRY),
+        retry=retry_if_result(
+            lambda outcome: (
+                outcome.verdict is DeliveryVerdict.RETRY and outcome.retry_after_seconds is None
+            )
+        ),
         before_sleep=before_sleep,
         # The caller reads the last outcome rather than catching RetryError.
         # Returning the verdict keeps "ran out of time" and "endpoint said no"

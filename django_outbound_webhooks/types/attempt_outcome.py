@@ -29,3 +29,11 @@ class AttemptOutcome:
 
     error: str = ""
     """The transport error, when there was no response at all."""
+
+    retry_after_seconds: float | None = None
+    """How long a ``429`` or ``503`` asked to be left alone, read from its
+    ``Retry-After`` header, or None when it did not say.
+
+    Set, it ends the inner tier and is handed to the outer one: the endpoint has
+    named a time, and waiting for it belongs in a database column that survives
+    a restart rather than in a sleep inside the lease."""
