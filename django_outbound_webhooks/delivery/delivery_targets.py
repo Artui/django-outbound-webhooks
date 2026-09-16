@@ -9,18 +9,25 @@ from django_domain_events import DeliveryContext
 from django_outbound_webhooks.delivery.replay_target import replay_target
 from django_outbound_webhooks.endpoints.endpoints_for import endpoints_for
 from django_outbound_webhooks.operations.endpoint_disabled import EndpointDisabled
+from django_outbound_webhooks.operations.endpoint_failing import EndpointFailing
+from django_outbound_webhooks.operations.endpoint_recovered import EndpointRecovered
 from django_outbound_webhooks.types.delivery_target import DeliveryTarget
 
 #: This package's own events, which are never delivered to a customer endpoint,
 #: whoever subscribes to them. The delivery receiver is a wildcard, so without
 #: this it would be owed them like any other event.
 #:
-#: ``EndpointDisabled`` is the reason the list exists: the endpoint most
-#: obviously interested in it has just been switched off, so every customer
-#: subscribed to it would hear only about *other* customers' integrations
-#: failing - somebody else's operational detail, arriving signed, over their
-#: webhook.
-INTERNAL_EVENTS: tuple[type, ...] = (EndpointDisabled,)
+#: All three are about one endpoint's health, and the reason is the same for
+#: each: the endpoint most obviously interested is the one failing, switched
+#: off, or only just back - so every *other* customer subscribed would hear about
+#: somebody else's integration, arriving signed, over their webhook. They are
+#: for the operator's own receivers, which tell the customer through a channel
+#: that is not the broken one.
+#:
+#: Written once, here, against the one receiver that delivers, rather than per
+#: event: a new health event added without joining this list would be
+#: delivered to every subscriber, which the tests check for each member.
+INTERNAL_EVENTS: tuple[type, ...] = (EndpointDisabled, EndpointFailing, EndpointRecovered)
 
 
 def delivery_targets(event: object, context: DeliveryContext) -> list[str]:

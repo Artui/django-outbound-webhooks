@@ -138,6 +138,110 @@ def test_the_increment_happens_in_the_database() -> None:
     with CaptureQueriesContext(connection) as queries:
         note_dead_delivery(endpoint.pk)
 
-    update = next(q["sql"] for q in queries.captured_queries if q["sql"].startswith("UPDATE"))
-    assert '"consecutive_dead_deliveries" + 1' in update
-    assert "= 5" not in update
+    updates = [q["sql"] for q in queries.captured_queries if q["sql"].startswith("UPDATE")]
+    increment = next(sql for sql in updates if "+ 1" in sql)
+    assert '"consecutive_dead_deliveries" + 1' in increment
+    assert "= 5" not in increment
+    endpoint.refresh_from_db()
+    assert endpoint.consecutive_dead_deliveries == 5
+
+
+def _failing_events() -> list[dict[str, object]]:
+    return list(
+        EventRecord.objects.filter(name="django_outbound_webhooks.EndpointFailing")
+        .order_by("pk")
+        .values_list("payload", flat=True)
+    )
+
+
+@override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 3})
+def test_the_first_dead_delivery_warns_once_and_counts_once() -> None:
+    """Once per incident, never once per delivery - and the edge that fired the
+    warning is also the delivery that was counted, exactly once."""
+    endpoint = _endpoint()
+    assert [note_dead_delivery(endpoint.pk) for _ in range(2)] == [False, False]
+
+    endpoint.refresh_from_db()
+    assert endpoint.consecutive_dead_deliveries == 2
+    assert _failing_events() == [
+        {
+            "endpoint_id": endpoint.pk,
+            "endpoint_name": "Acme production",
+            "disabled_after_dead_deliveries": 3,
+        }
+    ]
+
+
+@override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": None})
+def test_it_warns_even_when_nothing_will_switch_the_endpoint_off() -> None:
+    """The configuration where the warning is the only signal anybody gets."""
+    endpoint = _endpoint()
+    for _ in range(3):
+        assert note_dead_delivery(endpoint.pk) is False
+
+    assert _failing_events() == [
+        {
+            "endpoint_id": endpoint.pk,
+            "endpoint_name": "Acme production",
+            "disabled_after_dead_deliveries": None,
+        }
+    ]
+
+
+@override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": None})
+def test_with_auto_disable_off_a_later_dead_delivery_reads_nothing() -> None:
+    """The ordinary case costs two conditional updates and no read."""
+    endpoint = _endpoint(consecutive_dead_deliveries=2)
+    with CaptureQueriesContext(connection) as queries:
+        note_dead_delivery(endpoint.pk)
+
+    statements = [q["sql"] for q in queries.captured_queries]
+    assert not [sql for sql in statements if sql.startswith("SELECT")]
+    assert len([sql for sql in statements if sql.startswith("UPDATE")]) == 2
+
+
+@override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 3})
+def test_a_new_incident_after_a_reset_warns_again() -> None:
+    endpoint = _endpoint()
+    note_dead_delivery(endpoint.pk)
+    Endpoint.objects.filter(pk=endpoint.pk).update(consecutive_dead_deliveries=0)
+    note_dead_delivery(endpoint.pk)
+
+    assert len(_failing_events()) == 2
+
+
+@override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 1})
+def test_a_threshold_of_one_warns_and_disables_on_the_same_delivery() -> None:
+    endpoint = _endpoint()
+    assert note_dead_delivery(endpoint.pk) is True
+
+    assert len(_failing_events()) == 1
+    assert EventRecord.objects.filter(name="django_outbound_webhooks.EndpointDisabled").count() == 1
+
+
+@override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": None})
+def test_the_edge_is_decided_by_the_database() -> None:
+    """Exactly once only because the condition travels in the statement.
+
+    The claim is about parallel workers and this suite is single-process, so
+    what is asserted is what makes it true: the zero-to-one change is an update
+    conditioned on the count being zero, not a decision made here after a read.
+    """
+    endpoint = _endpoint()
+    with CaptureQueriesContext(connection) as queries:
+        note_dead_delivery(endpoint.pk)
+
+    first_update = next(q["sql"] for q in queries.captured_queries if q["sql"].startswith("UPDATE"))
+    assert first_update.startswith(
+        'UPDATE "django_outbound_webhooks_endpoint" SET "consecutive_dead_deliveries" = 1 WHERE '
+    )
+    condition = first_update.split(" WHERE ", 1)[1]
+    assert '"consecutive_dead_deliveries" = 0' in condition
+
+
+def test_a_deleted_endpoint_warns_nobody() -> None:
+    endpoint = _endpoint()
+    endpoint_id = endpoint.pk
+    endpoint.delete()
+    assert note_dead_delivery(endpoint_id) is False
+    assert _failing_events() == []

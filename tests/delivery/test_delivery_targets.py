@@ -26,6 +26,8 @@ from django_outbound_webhooks.endpoints.register_endpoint import register_endpoi
 from django_outbound_webhooks.formats.format_registry import formats
 from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.operations.endpoint_disabled import EndpointDisabled
+from django_outbound_webhooks.operations.endpoint_failing import EndpointFailing
+from django_outbound_webhooks.operations.endpoint_recovered import EndpointRecovered
 from django_outbound_webhooks.types.delivery_target import DeliveryTarget
 from django_outbound_webhooks.types.format_id import FormatId
 from tests.testapp.events import OrderPlaced, OrderShipped
@@ -157,25 +159,40 @@ def test_the_frozen_format_is_the_endpoints_own(second_format: FormatId) -> None
     )
 
 
-def test_this_packages_own_event_is_never_delivered_even_to_a_subscriber() -> None:
-    """Sized so the exclusion is what answers.
+@pytest.mark.parametrize(
+    "event",
+    [
+        EndpointDisabled(endpoint_id=1, endpoint_name="x", dead_deliveries=20),
+        EndpointFailing(endpoint_id=1, endpoint_name="x", disabled_after_dead_deliveries=20),
+        EndpointRecovered(endpoint_id=1, endpoint_name="x"),
+    ],
+    ids=lambda event: type(event).__name__,
+)
+def test_this_packages_own_events_are_never_delivered_even_to_a_subscriber(event: object) -> None:
+    """Sized so the exclusion is what answers, once for each member.
 
     The endpoint really is subscribed to the internal event, and the tenant
     boundary really would match it - the precondition says so - so an empty
     result can only come from the exclusion and not from nobody subscribing.
+    One case per class, because a class-tuple ``isinstance`` is a single branch
+    to coverage whichever member it matches.
     """
-    name = "django_outbound_webhooks.EndpointDisabled"
+    name = registry.event_for_class(type(event)).name
     endpoint = _endpoint(event_names=[name])
     assert list(endpoints_for(event_name=name, scope={})) == [endpoint]
 
-    event_id = _fire(EndpointDisabled(endpoint_id=1, endpoint_name="x", dead_deliveries=20))
+    event_id = _fire(event)
 
     assert DeliveryRecord.objects.filter(event_id=event_id).count() == 0
 
 
 def test_the_internal_events_are_exactly_this_packages_own() -> None:
     names = {entry.name for entry in registry.events() if entry.event_class in INTERNAL_EVENTS}
-    assert names == {"django_outbound_webhooks.EndpointDisabled"}
+    assert names == {
+        "django_outbound_webhooks.EndpointDisabled",
+        "django_outbound_webhooks.EndpointFailing",
+        "django_outbound_webhooks.EndpointRecovered",
+    }
 
 
 def test_the_lookup_is_one_query_per_fired_event() -> None:

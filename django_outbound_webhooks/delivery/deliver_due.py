@@ -133,5 +133,5 @@ def deliver_due(event: object, context: DeliveryContext) -> None:
     # towards auto-disable any more. Inside the receiver rather than beside it:
     # this write belongs to the same transaction as the log rows, and a reset
     # that survived a rolled-back delivery would forgive a failure that stood.
-    note_successful_delivery(target.endpoint_id)
+    note_successful_delivery(endpoint)
     pending_attempts.set(None)

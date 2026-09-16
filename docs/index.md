@@ -68,7 +68,11 @@ which is right for a leaked secret and wrong for everything else.
 Auto-disable switches an endpoint off after
 `AUTO_DISABLE_AFTER_DEAD_DELIVERIES` consecutive **dead deliveries** - the outer
 tier, each already having spent its whole attempt budget - and fires
-`EndpointDisabled` so something in your project can tell the customer. A
+`EndpointDisabled` so something in your project can tell the customer. Before
+that, the first dead delivery of an incident fires `EndpointFailing` - once, and
+also when auto-disable is off - and the delivery that ends it fires
+`EndpointRecovered`, so a warning sent on the way in has a match on the way out.
+None of the three is delivered to customer endpoints. A
 delivery that lands resets the count, which is what makes the threshold mean
 *sustained*. `reactivate_endpoint(endpoint)` puts it back into service and
 clears the count, which has to happen together: an endpoint re-enabled with its

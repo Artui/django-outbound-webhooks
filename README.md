@@ -114,6 +114,12 @@ A rotation overlaps. The specification carries several signatures in one header
 and a receiver accepts the delivery if any verifies, so the customer deploys the
 new secret on their own schedule and nothing is dropped in between.
 
+The first dead delivery of an incident fires `EndpointFailing`, and the delivery
+that ends it fires `EndpointRecovered` - once each, however much traffic the
+incident spans, and even with auto-disable turned off, where the warning is the
+only signal there is. `EndpointFailing` carries the threshold that will switch
+the endpoint off, so a notification can say when.
+
 An endpoint that stops answering is switched off after
 `AUTO_DISABLE_AFTER_DEAD_DELIVERIES` consecutive **dead deliveries** - each of
 which has already spent a whole attempt budget across processes and hours, so
@@ -129,6 +135,9 @@ from django_outbound_webhooks.operations.endpoint_disabled import EndpointDisabl
 @receiver(EndpointDisabled, key="acme.email_the_customer")
 def email_the_customer(disabled: EndpointDisabled) -> None: ...
 ```
+
+None of the three is ever delivered to a customer endpoint: whoever subscribed
+would be told about somebody else's integration, over their own webhook.
 
 ## Admin
 

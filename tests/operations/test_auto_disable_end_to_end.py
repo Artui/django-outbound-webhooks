@@ -114,3 +114,56 @@ def test_a_delivery_that_lands_clears_the_count(monkeypatch: pytest.MonkeyPatch)
     endpoint.refresh_from_db()
     assert endpoint.consecutive_dead_deliveries == 0
     assert endpoint.is_active is True
+
+
+def _names(name: str) -> int:
+    return EventRecord.objects.filter(name=f"django_outbound_webhooks.{name}").count()
+
+
+def test_an_incident_is_announced_once_and_closed_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Driven by real deliveries: two dying for real warn once, and the delivery
+    that lands afterwards closes it once."""
+    _answering(monkeypatch, 500)
+    endpoint = _endpoint()
+    _fire_and_drain()
+    assert (_names("EndpointFailing"), _names("EndpointRecovered")) == (1, 0)
+
+    _answering(monkeypatch, 200)
+    _fire_and_drain(times=2)
+    _fire_and_drain(times=2)
+
+    endpoint.refresh_from_db()
+    assert endpoint.consecutive_dead_deliveries == 0
+    assert (_names("EndpointFailing"), _names("EndpointRecovered")) == (1, 1)
+
+
+def test_the_warning_reaches_nobody_over_a_webhook(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Even the failing endpoint, subscribed to its own warning."""
+    seen = _answering(monkeypatch, 500)
+    register_endpoint(
+        name="Watcher",
+        url="https://watcher.test/hooks",
+        secret=SECRET,
+        event_names=["django_outbound_webhooks.EndpointFailing"],
+    )
+    _endpoint()
+    _fire_and_drain()
+
+    assert _names("EndpointFailing") == 1
+    assert {request.url.host for request in seen} == {"example.test"}
+
+
+def test_with_auto_disable_off_the_warning_still_fires(
+    monkeypatch: pytest.MonkeyPatch, settings: object
+) -> None:
+    settings.DJANGO_OUTBOUND_WEBHOOKS = {
+        **settings.DJANGO_OUTBOUND_WEBHOOKS,
+        "AUTO_DISABLE_AFTER_DEAD_DELIVERIES": None,
+    }
+    _answering(monkeypatch, 500)
+    _endpoint()
+    _fire_and_drain()
+
+    assert _names("EndpointFailing") == 1
+    record = EventRecord.objects.get(name="django_outbound_webhooks.EndpointFailing")
+    assert record.payload["disabled_after_dead_deliveries"] is None
