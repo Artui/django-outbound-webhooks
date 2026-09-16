@@ -132,14 +132,14 @@ Each was found by hitting it, and each will recur.
   this package early, on its way to loading the app. The failure surfaces
   nowhere near its cause: `makemigrations` dies in the substrate's decorator,
   with a traceback whose only line in this repository is the `__init__` doing
-  the re-export. So `WebhookDeliveryDue` and `EndpointDisabled` are not
-  re-exported, and `replay_delivery` - which is - imports its event inside the
+  the re-export. So `EndpointDisabled`, `EndpointFailing` and
+  `EndpointRecovered` are not re-exported, and `replay_delivery` - which is - imports its event inside the
   function. A receiver in somebody else's app imports one by leaf path, which is
   where their code lives anyway.
 
   The rule is narrower than "never import an event at module scope", and the
   narrow version is the one to hold: module scope is fine in a module nothing
-  reachable from the root `__init__` imports, which is why `register_fan_out`
+  reachable from the root `__init__` imports, which is why `delivery_targets`
   and `note_dead_delivery` both do it. **Adding a re-export is what breaks it**,
   and it breaks importing the package rather than the line that was added.
 - **`ty` cannot see a foreign key's implicit `<fk>_id`**, because Django creates
