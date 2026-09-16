@@ -43,8 +43,9 @@ dependencies = [
     # wildcard receiver with targets= fan-out, which delivery is declared on:
     # one receiver for every event and one delivery row per endpoint, where
     # older releases need an event fired per endpoint and a receiver per event
-    # type. It also keeps the receiver's on_failure hook, without which the
-    # delivery log records successes and silently loses every failure.
+    # type. It also buys RetryAfter, which carries an endpoint's Retry-After to
+    # the outer retry tier, and keeps the receiver's on_failure hook, without
+    # which the delivery log records successes and silently loses every failure.
     "django-domain-events>=0.9.0",
     # The transport. Chosen over its predecessor because the request-forgery
     # policy is a transport concern: pinning a validated address while TLS still

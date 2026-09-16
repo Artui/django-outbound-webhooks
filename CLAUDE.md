@@ -233,7 +233,9 @@ a failed attempt - a receiver's writes are discarded when it raises, so without
 it the table holds successes and nothing else. **0.9.0** adds the `AnyEvent`
 wildcard receiver and `targets=` fan-out, which delivery is declared on: one
 receiver owes every event, and the callable writes a delivery row per endpoint
-subscribed to it. Do not lower it.
+subscribed to it; it also adds `RetryAfter`, which is how an endpoint's
+`Retry-After` reaches the outer retry tier instead of a sleep inside the lease.
+Do not lower it.
 
 This table said **0.7.0** for a day after 0.1.0 raised it, with the paragraph
 below it still explaining the old number. Nothing failed: the resolver reads
