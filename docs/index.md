@@ -6,6 +6,17 @@ Webhooks signing, and per-endpoint delivery built as a durable receiver on
 
 Your customers subscribe to domain events, not to your `post_save` signals.
 
+## How delivery works
+
+One durable receiver is declared for every event, with a `targets=` callable
+that names the endpoints subscribed to it. The substrate calls it when an event
+is fired, inside the firing transaction, and writes one delivery row per
+endpoint - each carrying the endpoint's pinned format and a `webhook-id` minted
+for that delivery - so every endpoint has its own attempts, backoff,
+dead-letter and replay. An event nobody subscribes to writes no row. The lookup
+is one indexed query on every event the project fires, and the receiver is
+matched at fire time, so the order of `INSTALLED_APPS` does not matter.
+
 ## Body formats
 
 An endpoint is pinned to one published format *version* at registration, and a

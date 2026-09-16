@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django_domain_events import registry
 
-from django_outbound_webhooks.delivery.register_fan_out import INTERNAL_EVENTS, KEY_PREFIX
+from django_outbound_webhooks.delivery.delivery_targets import INTERNAL_EVENTS
 from django_outbound_webhooks.operations.endpoint_disabled import EndpointDisabled
 
 
@@ -16,13 +16,12 @@ def test_it_is_declared_under_this_app_label() -> None:
     assert "django_outbound_webhooks.EndpointDisabled" in names
 
 
-def test_it_is_not_fanned_out_to_customer_endpoints() -> None:
+def test_it_is_never_delivered_to_customer_endpoints() -> None:
     # Reads like an omission and is the opposite: the endpoint most obviously
     # interested has just been switched off, so a customer subscribed to this
-    # would only ever hear about other people's endpoints failing.
+    # would only ever hear about other people's endpoints failing. The
+    # behaviour, with a subscriber, is tested beside delivery_targets.
     assert EndpointDisabled in INTERNAL_EVENTS
-    keys = {entry.key for entry in registry.receivers()}
-    assert f"{KEY_PREFIX}.django_outbound_webhooks.EndpointDisabled" not in keys
 
 
 def test_an_operator_can_receive_it() -> None:

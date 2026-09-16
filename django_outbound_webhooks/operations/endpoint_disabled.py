@@ -20,8 +20,9 @@ class EndpointDisabled:
     learns something happened here, and this deployment already has an event
     log, ordered and durable and replayable, because this package requires one.
 
-    It is not fanned out to customer endpoints, which reads like an omission and
-    is the opposite. The one endpoint most obviously interested in this event is
+    It is never delivered to customer endpoints, even one subscribed to it by
+    name - ``INTERNAL_EVENTS`` in ``delivery_targets`` - which reads like an
+    omission and is the opposite. The one endpoint most obviously interested in this event is
     the one it is about, and that endpoint has just been switched off; a
     customer subscribed to it would be told about every *other* endpoint's
     failures instead, which is somebody else's operational detail arriving over

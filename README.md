@@ -23,6 +23,22 @@ retry, backoff, dead-lettering and replay are inherited rather than rebuilt.
 pip install django-outbound-webhooks
 ```
 
+## How delivery works
+
+One durable receiver, declared for every event. When your code fires an event,
+the endpoints subscribed to it - within its tenant, when the deployment has
+tenants - are looked up in the same transaction, and each gets a delivery row of
+its own, carrying the format it is pinned to and a `webhook-id` minted for it. So
+every endpoint has its own attempt count, backoff, dead-letter and replay, and a
+rotted endpoint cannot drag the others through its retries. An event nobody
+subscribes to writes no delivery row at all.
+
+Two things follow from where the lookup runs. It is **one indexed query in the
+transaction that fires the event**, on every event your project fires. And it
+does not depend on the order of `INSTALLED_APPS`: the receiver is matched when an
+event is fired, so an event declared by an app listed after this one is delivered
+like any other.
+
 ## Body formats
 
 A customer's endpoint is pinned to one published format *version* when it
@@ -82,7 +98,12 @@ reactivate_endpoint(endpoint)  # back on, and the failure count cleared
 A replay is a **new** delivery: a new `webhook-id` (a receiver deduplicates on
 that one), the endpoint's current format and secrets, and its own delivery row,
 attempt budget and log rows. It refuses rather than firing something that cannot
-arrive - a deleted endpoint, an inactive one, an event retention has pruned.
+arrive - a deleted endpoint, an inactive one, an event retention has pruned, or
+an event no longer declared.
+
+Replaying the whole *event* with django-domain-events' own `replay_events` is a
+different operation: it delivers the event again to every endpoint subscribed
+**now**, each under a new `webhook-id`.
 
 A rotation overlaps. The specification carries several signatures in one header
 and a receiver accepts the delivery if any verifies, so the customer deploys the

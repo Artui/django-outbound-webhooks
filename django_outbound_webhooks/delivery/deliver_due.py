@@ -10,7 +10,6 @@ from django_outbound_webhooks.delivery.pending_attempts import PendingAttempts, 
 from django_outbound_webhooks.delivery.record_attempts import record_attempts
 from django_outbound_webhooks.delivery.send_webhook import send_webhook
 from django_outbound_webhooks.delivery.webhook_client import webhook_client
-from django_outbound_webhooks.delivery.webhook_delivery_due import WebhookDeliveryDue
 from django_outbound_webhooks.formats.format_registry import formats
 from django_outbound_webhooks.operations.note_successful_delivery import (
     note_successful_delivery,
@@ -18,8 +17,14 @@ from django_outbound_webhooks.operations.note_successful_delivery import (
 from django_outbound_webhooks.settings import setting
 from django_outbound_webhooks.signing.signing_secrets import signing_secrets
 from django_outbound_webhooks.types.attempt_outcome import AttemptOutcome
+from django_outbound_webhooks.types.delivery_target import DeliveryTarget
 from django_outbound_webhooks.types.delivery_verdict import DeliveryVerdict
 from django_outbound_webhooks.types.format_id import FormatId
+
+#: The key the delivery receiver is registered under. Every delivery row this
+#: package owes names it, so it is stable across releases, and ``replay_delivery``
+#: narrows a substrate replay to it.
+RECEIVER_KEY = "django_outbound_webhooks.deliver"
 
 
 class DeliveryFailed(Exception):
@@ -32,8 +37,19 @@ class DeliveryFailed(Exception):
     """
 
 
-def deliver_due(due: WebhookDeliveryDue, context: DeliveryContext) -> None:
-    """Deliver one copy, or raise so the substrate retries it.
+def deliver_due(event: object, context: DeliveryContext) -> None:
+    """Deliver one endpoint's copy of one event, or raise so the substrate retries it.
+
+    The receiver for every event, declared for ``AnyEvent``: ``context.target``
+    says which endpoint this delivery is for and carries the recipe frozen when
+    the event was fired. The decoded ``event`` is not what is rendered. The body
+    is built from the event *row*, whose payload is written once and never
+    edited, so every attempt and every replay renders the same bytes that a
+    format version promises.
+
+    The row is always there. This delivery row belongs to it, and the substrate
+    prunes only events with nothing left owed, so the case a separate delivery
+    event once had to refuse - its source pruned while it waited - cannot arise.
 
     Imported inside the function for the reason the substrate documents: Django
     imports an app's package before the app registry is ready, and these are
@@ -43,27 +59,18 @@ def deliver_due(due: WebhookDeliveryDue, context: DeliveryContext) -> None:
 
     from django_outbound_webhooks.models.endpoint import Endpoint
 
-    endpoint = Endpoint.objects.filter(pk=due.endpoint_id).first()
+    target = DeliveryTarget.decode(context.target)
+    endpoint = Endpoint.objects.filter(pk=target.endpoint_id).first()
     if endpoint is None or not endpoint.is_active:
-        # Deleted or switched off between the fan-out and now. Nothing is owed,
+        # Deleted or switched off since the event was fired. Nothing is owed,
         # and returning quietly is what says so: raising would retry a delivery
         # whose destination the customer removed on purpose.
         return
 
-    source = EventRecord.objects.filter(pk=due.source_event_id).first()
-    if source is None:
-        # Pruned out from under us. The bytes cannot be reconstructed, so this
-        # can never succeed; it raises to be recorded rather than returning,
-        # because a delivery that silently never happened is the failure mode
-        # this package exists to avoid.
-        raise DeliveryFailed(
-            f"Event {due.source_event_id} is no longer in the log, so delivery "
-            f"{due.message_id} can never be rendered. Retention is outrunning delivery."
-        )
-
-    body_format = formats.get(FormatId(name=due.format_name, version=due.format_version))
+    source = EventRecord.objects.get(pk=context.event_id)
+    body_format = formats.get(FormatId(name=target.format_name, version=target.format_version))
     body = body_format.render(
-        message_id=due.message_id,
+        message_id=target.message_id,
         event_name=source.name,
         occurred_at=source.occurred_at.isoformat(),
         payload=source.payload,
@@ -74,7 +81,8 @@ def deliver_due(due: WebhookDeliveryDue, context: DeliveryContext) -> None:
     # runs after this function has already raised, so clearing on the way out
     # would empty it before its only reader looks.
     pending = PendingAttempts(
-        due=due,
+        target=target,
+        source_event_id=source.pk,
         url=endpoint.url,
         outer_attempt=context.attempt,
         request_body_sha256=hashlib.sha256(body.body).hexdigest(),
@@ -89,7 +97,7 @@ def deliver_due(due: WebhookDeliveryDue, context: DeliveryContext) -> None:
             client=client,
             url=endpoint.url,
             secrets=signing_secrets(endpoint),
-            message_id=due.message_id,
+            message_id=target.message_id,
             body=body,
             lease_seconds=lease_seconds,
             history=outcomes,
@@ -99,7 +107,7 @@ def deliver_due(due: WebhookDeliveryDue, context: DeliveryContext) -> None:
         # The log is written by the failure hook instead, from outside the
         # transaction this raise is about to roll back.
         raise DeliveryFailed(
-            f"Delivery {due.message_id} to endpoint {due.endpoint_id} came back "
+            f"Delivery {target.message_id} to endpoint {target.endpoint_id} came back "
             f"{final.verdict.value} on outer attempt {context.attempt} after "
             f"{len(outcomes)} request(s)."
         )
@@ -112,5 +120,5 @@ def deliver_due(due: WebhookDeliveryDue, context: DeliveryContext) -> None:
     # towards auto-disable any more. Inside the receiver rather than beside it:
     # this write belongs to the same transaction as the log rows, and a reset
     # that survived a rolled-back delivery would forgive a failure that stood.
-    note_successful_delivery(due.endpoint_id)
+    note_successful_delivery(target.endpoint_id)
     pending_attempts.set(None)

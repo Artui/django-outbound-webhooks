@@ -7,15 +7,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from django_outbound_webhooks.delivery.webhook_delivery_due import WebhookDeliveryDue
     from django_outbound_webhooks.types.attempt_outcome import AttemptOutcome
+    from django_outbound_webhooks.types.delivery_target import DeliveryTarget
 
 
 @dataclass(slots=True)
 class PendingAttempts:
     """What the log needs, held until whichever path survives can write it."""
 
-    due: WebhookDeliveryDue
+    target: DeliveryTarget
+    source_event_id: int
     url: str
     outer_attempt: int
     request_body_sha256: str

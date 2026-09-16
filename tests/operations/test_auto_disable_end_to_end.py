@@ -70,8 +70,8 @@ def _endpoint() -> Endpoint:
 def _fire_and_drain(times: int = 12) -> None:
     with transaction.atomic():
         fire(OrderPlaced(order_id=7, total_cents=2500))
-    # Drained repeatedly: the first pass fans out, the rest burn the delivery's
-    # outer attempt budget until the substrate declares it dead.
+    # Drained repeatedly: each pass is one outer attempt, and the passes burn the
+    # delivery's attempt budget until the substrate declares it dead.
     for _ in range(times):
         drain_outbox()
 
