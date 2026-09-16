@@ -5,10 +5,6 @@ from __future__ import annotations
 import inspect
 
 from django_outbound_webhooks.formats.body_format import BodyFormat
-from django_outbound_webhooks.types.delivery_target import (
-    FORMAT_NAME_MAX_ENCODED_LENGTH,
-    encoded_format_name_length,
-)
 from django_outbound_webhooks.types.format_id import FormatId
 
 #: The keywords a delivery calls ``render`` with. Checked at registration
@@ -91,18 +87,6 @@ class FormatRegistry:
         object is fine and is what a double import looks like.
         """
         _require_conforming(body_format)
-        encoded_length = encoded_format_name_length(body_format.name)
-        if encoded_length > FORMAT_NAME_MAX_ENCODED_LENGTH:
-            # Refused at startup rather than discovered at fire time, where the
-            # delivery target carrying this name would be refused inside the
-            # transaction that fired the event - failing the business change, for
-            # every event an endpoint pinned to it subscribes to.
-            raise ValueError(
-                f"Format name {body_format.name!r} is too long to carry in a delivery: it "
-                f"encodes to {encoded_length} characters and a delivery target holds at most "
-                f"{FORMAT_NAME_MAX_ENCODED_LENGTH}. Quotes and backslashes count twice and "
-                f"control characters six times."
-            )
         identity = FormatId(name=body_format.name, version=body_format.version)
         existing = self._formats.get(identity)
         if existing is not None and existing is not body_format:

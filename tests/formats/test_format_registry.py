@@ -35,25 +35,6 @@ def registry() -> FormatRegistry:
     return FormatRegistry()
 
 
-@pytest.mark.parametrize("name", ['"' * 51, "\x01" * 17, "\u00e9" * 101])
-def test_registration_refuses_a_name_a_delivery_target_cannot_carry(
-    registry: FormatRegistry, name: str
-) -> None:
-    # Measured as a delivery encodes it, not as typed: a quote costs two
-    # characters and a control character six. Refused here, at startup, because
-    # the alternative is a target the substrate refuses inside every business
-    # transaction that fires an event the endpoint subscribes to.
-    with pytest.raises(ValueError, match="too long to carry in a delivery") as refused:
-        registry.register(_Stub(name, 1))
-    assert "already published" not in str(refused.value)
-    assert registry.published() == []
-
-
-def test_registration_accepts_a_name_exactly_at_the_limit(registry: FormatRegistry) -> None:
-    registry.register(_Stub('"' * 50, 1))
-    assert registry.published() == [FormatId(name='"' * 50, version=1)]
-
-
 def test_a_registered_format_is_retrievable_by_its_identity(registry: FormatRegistry) -> None:
     stub = _Stub("envelope", 1)
     registry.register(stub)

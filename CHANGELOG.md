@@ -34,12 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replaying a whole event with the substrate's `replay_events` delivers it again
   to every endpoint subscribed at replay time, each under a new `webhook-id`,
   and leaves the original deliveries as they were.
-- **A format name is refused at registration when a delivery could not carry
-  it**: longer than 100 characters once JSON-encoded, where a quote or backslash
-  counts twice and a control character six times. The name now travels in each
-  delivery row's target, which django-domain-events refuses past 255 characters
-  inside the transaction that fires the event, so an overlong name would have
-  failed the business change for every event its endpoints subscribe to.
 
 ### Removed
 - `WebhookDeliveryDue`, the per-event fan-out receivers, and the `W001` system
