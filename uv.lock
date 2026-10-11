@@ -444,15 +444,15 @@ wheels = [
 
 [[package]]
 name = "django-domain-events"
-version = "0.11.0"
+version = "0.11.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django", version = "5.2.17", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "django", version = "6.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/67/dd/1f15e4c7bbb3709bd366f3996417d031be8ddf19544eff5cb18c9e5c1828/django_domain_events-0.11.0.tar.gz", hash = "sha256:10f390502cec3f501e6cbbce8771df346f8d7bd8e0aad860571038022f45cb70", size = 433782, upload-time = "2026-10-11T08:45:30.273Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3b/f8/c7310520d2042b4ea182ef499ce447bbdaccc8acf87821a8dfd9358f819b/django_domain_events-0.11.1.tar.gz", hash = "sha256:762f9e84ff9d1ec39e75b1c180927132d418a6ad820f817938106ea1e6882b36", size = 438127, upload-time = "2026-10-11T09:22:36.267Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ba/48/63936b068cadf435d09fb4374a95d893b077d565635b32a7d532f643ec68/django_domain_events-0.11.0-py3-none-any.whl", hash = "sha256:85a56725be2a6baa0d5437d2b34dda72fd0d173c441b53d08e3176dc4e6c953a", size = 165558, upload-time = "2026-10-11T08:45:28.785Z" },
+    { url = "https://files.pythonhosted.org/packages/61/ec/5737ce451a2feb413b5a325faa7d398ff2d16280f7b917de4ffc1d44809b/django_domain_events-0.11.1-py3-none-any.whl", hash = "sha256:983ab2f1a66d9a90d78e1930a9e82eff457981d2a109dc60a6f4588adc40bfdd", size = 167303, upload-time = "2026-10-11T09:22:34.681Z" },
 ]
 
 [[package]]
