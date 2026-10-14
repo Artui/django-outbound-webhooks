@@ -4,15 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.core.checks import Warning, register
+from django.core.checks import Warning
 
 from django_outbound_webhooks.formats.format_registry import formats
 from django_outbound_webhooks.settings import setting
 
 
-@register()
 def check_default_format_is_published(app_configs: Any, **kwargs: Any) -> list[Warning]:
     """Warn when the format new endpoints would pin does not exist.
+
+    Registered by ``WebhooksConfig.ready``, not by a decorator here: nothing in
+    a running project imports this module, so a decorator would register the
+    check only in a process that happened to import it, which is the test suite
+    and no deployment.
 
     ``DEFAULT_FORMAT`` is read at registration, not at startup, so a value
     naming nothing sits quietly until the first customer registers an endpoint

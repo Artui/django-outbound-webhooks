@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from django.apps import AppConfig
+from django.core.checks import register
+
+from django_outbound_webhooks.checks import check_default_format_is_published
 
 
 class WebhooksConfig(AppConfig):
@@ -40,6 +43,11 @@ class WebhooksConfig(AppConfig):
         from django_outbound_webhooks.settings import setting
 
         register_built_in_formats(formats)
+
+        # Registered here because nothing else imports checks.py at runtime: a
+        # decorator on the function would register it only where something had
+        # imported the module, which no deployment does.
+        register(check_default_format_is_published)
 
         # The lease is declared here and spent inside send_webhook, from the same
         # setting. Two numbers would be two ways for the receiver's lease and the
