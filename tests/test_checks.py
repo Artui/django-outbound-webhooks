@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 from django.test import override_settings
 
@@ -48,3 +52,26 @@ def test_the_format_check_is_registered_with_django() -> None:
     from django.core.checks.registry import registry as check_registry
 
     assert check_default_format_is_published in check_registry.get_checks()
+
+
+def test_the_format_check_is_registered_by_django_setup_alone() -> None:
+    # The in-process test above imports ``checks`` itself, so it passes whether
+    # or not anything in the app does. A deployment never imports it: Django
+    # sets up, ``manage.py check`` runs the registered checks, and a check no
+    # code path imported is not among them. A fresh interpreter that only calls
+    # ``django.setup()`` is the one place the difference shows.
+    code = (
+        "import django\n"
+        "django.setup()\n"
+        "from django.core.checks.registry import registry\n"
+        "print([check.__name__ for check in registry.get_checks()])\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr[-2000:]
+    assert "check_default_format_is_published" in result.stdout
