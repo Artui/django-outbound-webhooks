@@ -19,11 +19,13 @@ class WebhooksConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
 
     def ready(self) -> None:
-        # Function-local by necessity, not preference. Django imports an app's
-        # AppConfig before the app registry is populated, so a module-level
-        # import here would run too early for anything touching models or
-        # declaring an event -- which the targets callable does transitively,
-        # through the events it refuses to deliver.
+        # The receiver-side imports below stay inside ready(). deliver_due,
+        # delivery_targets and record_failed_attempts reach the models or declare
+        # an @event, and importing any of them while the app registry is still
+        # populating raises AppRegistryNotReady. Django imports this module before
+        # that point, so moving those three to module scope fails the same way.
+        # The other names here import without the registry; they stay with the
+        # wiring they serve.
         from django_domain_events import AnyEvent, receiver
 
         from django_outbound_webhooks.delivery.deliver_due import RECEIVER_KEY, deliver_due

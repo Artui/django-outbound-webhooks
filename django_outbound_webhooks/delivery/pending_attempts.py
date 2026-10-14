@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from django_outbound_webhooks.types.attempt_outcome import AttemptOutcome
-    from django_outbound_webhooks.types.delivery_target import DeliveryTarget
+from django_outbound_webhooks.types.attempt_outcome import AttemptOutcome
+from django_outbound_webhooks.types.delivery_target import DeliveryTarget
 
 
 @dataclass(slots=True)

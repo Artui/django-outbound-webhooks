@@ -100,6 +100,11 @@ rotate_secret(endpoint, new_secret=secret)  # both secrets sign until the window
 reactivate_endpoint(endpoint)  # back on, and the failure count cleared
 ```
 
+Importing the package does not load the models, but these names and the
+modules that define them do, so they can only be imported once Django's app
+registry is ready. Import them from a view, a task or a signal handler, not at
+the top of an `apps.py`, a package `__init__.py`, or a settings module.
+
 A replay is a **new** delivery: a new `webhook-id` (a receiver deduplicates on
 that one), the endpoint's current format and secrets, and its own delivery row,
 attempt budget and log rows. It refuses rather than firing something that cannot

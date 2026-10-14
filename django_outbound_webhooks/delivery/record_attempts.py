@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from django_outbound_webhooks.delivery.pending_attempts import PendingAttempts
+from django_outbound_webhooks.delivery.pending_attempts import PendingAttempts
+from django_outbound_webhooks.models.delivery_attempt import DeliveryAttempt
 
 
 def record_attempts(pending: PendingAttempts) -> int:
@@ -16,8 +14,6 @@ def record_attempts(pending: PendingAttempts) -> int:
     split is not tidiness -- a receiver's writes are discarded the moment it
     raises, so the attempts most worth recording are the ones it cannot record.
     """
-    from django_outbound_webhooks.models.delivery_attempt import DeliveryAttempt
-
     rows = [
         DeliveryAttempt(
             message_id=pending.target.message_id,

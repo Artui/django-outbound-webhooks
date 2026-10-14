@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The package root imports lighter, and the names that reach the models resolve on first access.** Importing `django_outbound_webhooks` now loads 12 package modules instead of 43, and no longer loads `django.db.models`. `ReplayRefused`, `endpoints_for`, `pinned_format`, `reactivate_endpoint`, `register_endpoint`, `replay_delivery`, `rotate_secret` and `signing_secrets` are served by a module-level `__getattr__`, and they remain in `__all__` and `dir()`. Names, signatures and leaf module paths are unchanged, and a new `__init__.pyi` gives type checkers the same signatures as before. **What changes:** the eight names above and the leaf modules that define them (`deliver_due`, `record_attempts`, `endpoints_for`, `pinned_format`, `register_endpoint`, `note_successful_delivery`, `reactivate_endpoint`, `replay_delivery`, `rotate_secret`, `signing_secrets`) now need Django's app registry to be ready. Before this change those imports worked before `django.setup()`; now they raise `AppRegistryNotReady`, so `from django_outbound_webhooks import register_endpoint`, `import *` and those ten imports cannot sit at the top of an `apps.py`, a package `__init__.py` or a settings module. This breaks consumers that imported them that early, and it is a minor-version change below 1.0. The `TYPE_CHECKING` guards and the function-local model imports that existed only for the old ordering are gone.
+
 ## [0.4.0] — 2026-09-16
 
 Delivery rebuilt on django-domain-events 0.9.0, which grew the wildcard

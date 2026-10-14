@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from django.db.models import QuerySet
 
+from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.settings import setting
-
-if TYPE_CHECKING:
-    from django_outbound_webhooks.models.endpoint import Endpoint
 
 
 def endpoints_for(*, event_name: str, scope: Mapping[str, Any]) -> QuerySet[Endpoint]:
@@ -31,13 +29,6 @@ def endpoints_for(*, event_name: str, scope: Mapping[str, Any]) -> QuerySet[Endp
     -able column, so a scope carrying an empty string would otherwise match
     every endpoint that never set one.
     """
-    # Imported here, not at module level: Django imports an app's package
-    # before the app registry is ready, and this package's __init__ re-exports
-    # this function, so a top-level model import would make importing the
-    # package raise AppRegistryNotReady. The substrate does the same in fire()
-    # for the same reason.
-    from django_outbound_webhooks.models.endpoint import Endpoint
-
     subscribed = Endpoint.objects.filter(is_active=True, subscriptions__event_name=event_name)
 
     tenant_key = setting("TENANT_SCOPE_KEY")

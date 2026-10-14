@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from django.utils import timezone
 
-if TYPE_CHECKING:
-    from django_outbound_webhooks.models.endpoint import Endpoint
+from django_outbound_webhooks.models.endpoint import Endpoint
 
 
 def signing_secrets(endpoint: Endpoint) -> list[str]:

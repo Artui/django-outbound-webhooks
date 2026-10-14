@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from django_outbound_webhooks.types.delivery_target import DeliveryTarget
+from django_outbound_webhooks.types.delivery_target import DeliveryTarget
 
 #: Set by ``replay_delivery`` for the duration of one substrate replay, as the
 #: event being replayed and the single target it is owed.

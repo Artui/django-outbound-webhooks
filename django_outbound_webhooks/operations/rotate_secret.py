@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import TYPE_CHECKING
 
 from django.utils import timezone
 
+from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.settings import setting
 from django_outbound_webhooks.signing.validate_signing_secret import validate_signing_secret
-
-if TYPE_CHECKING:
-    from django_outbound_webhooks.models.endpoint import Endpoint
 
 
 def rotate_secret(

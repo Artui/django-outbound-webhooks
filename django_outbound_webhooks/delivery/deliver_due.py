@@ -5,12 +5,14 @@ from __future__ import annotations
 import hashlib
 
 from django_domain_events import DeliveryContext, RetryAfter
+from django_domain_events.models.event_record import EventRecord
 
 from django_outbound_webhooks.delivery.pending_attempts import PendingAttempts, pending_attempts
 from django_outbound_webhooks.delivery.record_attempts import record_attempts
 from django_outbound_webhooks.delivery.send_webhook import send_webhook
 from django_outbound_webhooks.delivery.webhook_client import webhook_client
 from django_outbound_webhooks.formats.format_registry import formats
+from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.operations.note_successful_delivery import (
     note_successful_delivery,
 )
@@ -50,15 +52,7 @@ def deliver_due(event: object, context: DeliveryContext) -> None:
     The row is always there. This delivery row belongs to it, and the substrate
     prunes only events with nothing left owed, so the case a separate delivery
     event once had to refuse - its source pruned while it waited - cannot arise.
-
-    Imported inside the function for the reason the substrate documents: Django
-    imports an app's package before the app registry is ready, and these are
-    models.
     """
-    from django_domain_events.models.event_record import EventRecord
-
-    from django_outbound_webhooks.models.endpoint import Endpoint
-
     target = DeliveryTarget.decode(context.target)
     endpoint = Endpoint.objects.filter(pk=target.endpoint_id).first()
     if endpoint is None or not endpoint.is_active:

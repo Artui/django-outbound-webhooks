@@ -5,9 +5,11 @@ from __future__ import annotations
 import uuid
 
 from django_domain_events import registry, replay_events
+from django_domain_events.models.event_record import EventRecord
 
 from django_outbound_webhooks.delivery.deliver_due import RECEIVER_KEY
 from django_outbound_webhooks.delivery.replay_target import replay_target
+from django_outbound_webhooks.models.delivery_attempt import DeliveryAttempt
 from django_outbound_webhooks.types.delivery_target import DeliveryTarget
 
 
@@ -46,14 +48,6 @@ def replay_delivery(*, message_id: str) -> str:
     posts anything: this returns as soon as the row is written, and the relay
     does the work.
     """
-    # Both imported here rather than at module scope: Django imports an app's
-    # package before the app registry is ready, and this package's __init__
-    # re-exports this function, so a model imported up there would raise
-    # AppRegistryNotReady.
-    from django_domain_events.models.event_record import EventRecord
-
-    from django_outbound_webhooks.models.delivery_attempt import DeliveryAttempt
-
     attempt = (
         DeliveryAttempt.objects.select_related("endpoint")
         .filter(message_id=message_id)

@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.types.format_id import FormatId
-
-if TYPE_CHECKING:
-    from django_outbound_webhooks.models.endpoint import Endpoint
 
 
 def pinned_format(endpoint: Endpoint) -> FormatId:

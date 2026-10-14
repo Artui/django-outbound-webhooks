@@ -3,17 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from django_outbound_webhooks.formats.format_registry import formats
+from django_outbound_webhooks.models.endpoint import Endpoint
+from django_outbound_webhooks.models.subscription import Subscription
 from django_outbound_webhooks.settings import setting
 from django_outbound_webhooks.types.format_id import FormatId
-
-if TYPE_CHECKING:
-    from django_outbound_webhooks.models.endpoint import Endpoint
 
 
 def register_endpoint(
@@ -41,13 +39,6 @@ def register_endpoint(
     An explicitly requested version is checked against what is published, so a
     typo fails at registration rather than at the first delivery.
     """
-    # Imported here, not at module level: Django imports an app's package before
-    # the app registry is ready and this package's __init__ re-exports this
-    # function, so a top-level model import would make importing the package
-    # raise AppRegistryNotReady.
-    from django_outbound_webhooks.models.endpoint import Endpoint
-    from django_outbound_webhooks.models.subscription import Subscription
-
     if not event_names:
         raise ValidationError(
             "An endpoint with no subscriptions receives nothing. Name at least one event.",
