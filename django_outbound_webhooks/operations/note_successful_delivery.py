@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from django_domain_events import fire
 
-if TYPE_CHECKING:
-    from django_outbound_webhooks.models.endpoint import Endpoint
+from django_outbound_webhooks.models.endpoint import Endpoint
+from django_outbound_webhooks.operations.endpoint_recovered import EndpointRecovered
 
 
 def note_successful_delivery(endpoint: Endpoint) -> None:
@@ -37,16 +35,6 @@ def note_successful_delivery(endpoint: Endpoint) -> None:
     a delivery rolled back because its worker lost the row takes the reset and
     the event with it.
     """
-    # Both inside the function, and neither is optional. Django imports an app's
-    # package before the app registry is ready, and this module *is* reachable
-    # from the package root - through replay_delivery, which is re-exported and
-    # imports the delivery receiver's module for its key. A model imported at
-    # module scope raises AppRegistryNotReady there, and so does an event class,
-    # because @event resolves its name through the app registry. Hoisting the
-    # event import was tried, and `manage.py check` died on it.
-    from django_outbound_webhooks.models.endpoint import Endpoint
-    from django_outbound_webhooks.operations.endpoint_recovered import EndpointRecovered
-
     recovered = Endpoint.objects.filter(pk=endpoint.pk, consecutive_dead_deliveries__gt=0).update(
         consecutive_dead_deliveries=0
     )

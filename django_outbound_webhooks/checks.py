@@ -6,6 +6,9 @@ from typing import Any
 
 from django.core.checks import Warning, register
 
+from django_outbound_webhooks.formats.format_registry import formats
+from django_outbound_webhooks.settings import setting
+
 
 @register()
 def check_default_format_is_published(app_configs: Any, **kwargs: Any) -> list[Warning]:
@@ -27,9 +30,6 @@ def check_default_format_is_published(app_configs: Any, **kwargs: Any) -> list[W
     must not be allowed to stop ``migrate`` on a deployment whose existing
     customers are fine.
     """
-    from django_outbound_webhooks.formats.format_registry import formats
-    from django_outbound_webhooks.settings import setting
-
     default = setting("DEFAULT_FORMAT")
     families = sorted({identity.name for identity in formats.published()})
     if default in families:

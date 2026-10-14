@@ -42,8 +42,12 @@ Non-negotiable. They keep the package navigable.
    prefix.
 3. **Non-exported helpers shared across files** go in that package's `utils.py`.
 4. **Top-level imports only.** Lazy or function-local imports are forbidden
-   unless a circular import is proven, or the import targets a declared optional
-   dependency gated behind an opt-in. Document the reason inline.
+   except in two cases, both documented inline. (a) **App-registry ordering, not
+   circularity:** a module that reaches a model or an `@event` class cannot load
+   while the app registry is still populating, so the import waits for it. The
+   sites are the lazy table `_LAZY_EXPORTS` in `__init__.py`, and the imports
+   inside `AppConfig.ready()` in `apps.py` that reach the receiver. (b) The
+   import targets a declared optional dependency gated behind an opt-in.
 5. **Full type annotations on every function and method signature.** `Any` is
    allowed only at the Django boundary where the type genuinely is `Any`.
 6. **`__init__.py` is the only re-export point.** Each `__init__.py` lists the
@@ -125,24 +129,36 @@ Each was found by hitting it, and each will recur.
   2026-09-11, so a move now needs a migration that rewrites the stored path for
   every install that already ran the old one, and the sentence above no longer
   prices anything at zero.
+- **The package root serves every name that reaches the model layer lazily.**
+  Django imports this package while it is still loading apps, and a model cannot
+  be imported then: the class raises `AppRegistryNotReady`. So `__init__.py`
+  binds only the names whose import chain stays clear of `models/`, and serves
+  the rest through a module-level `__getattr__` backed by `_LAZY_EXPORTS`, a table
+  from name to leaf module. The static types for those names live in
+  `__init__.pyi`, the stub a consumer's type checker reads; without it every
+  lazy name is `object` to a consumer. `tests/test_root_exports.py` holds the
+  table, the stub and `__all__` to one set of names. Its static partition test
+  fails when a lazy name is also bound by a plain import, and its fresh-interpreter
+  test fails when a plain import loads a lazy leaf, a models module or
+  `django.db.models`. The eager-import regression is caught first by the test
+  run's startup: pytest-django sets Django up by importing the package, so the
+  run dies before any test executes. That startup failure is the loud gate; the
+  partition test is the one to run in isolation. **A new name that reaches a
+  model goes in the table and gets a line in the stub; a plain import of one in
+  `__init__.py` breaks importing the package**, not the line that was added.
 - **An `@event` class cannot be imported at module scope by anything the package
   root re-exports**, for the same reason a model cannot. `@event` resolves the
   event's name through `apps.get_containing_app_config`, so importing one before
-  the app registry is ready raises `AppRegistryNotReady` - and Django imports
-  this package early, on its way to loading the app. The failure surfaces
+  the app registry is ready raises `AppRegistryNotReady`. The failure surfaces
   nowhere near its cause: `makemigrations` dies in the substrate's decorator,
   with a traceback whose only line in this repository is the `__init__` doing
   the re-export. So `EndpointDisabled`, `EndpointFailing` and `EndpointRecovered`
-  are not re-exported, and `note_successful_delivery` - which the root reaches
-  through `replay_delivery` importing the delivery receiver's module for its key -
-  imports `EndpointRecovered` inside the function. A receiver in somebody else's
-  app imports one by leaf path, which is where their code lives anyway.
-
-  The rule is narrower than "never import an event at module scope", and the
-  narrow version is the one to hold: module scope is fine in a module nothing
-  reachable from the root `__init__` imports, which is why `delivery_targets`
-  and `note_dead_delivery` both do it. **Adding a re-export is what breaks it**,
-  and it breaks importing the package rather than the line that was added.
+  are not re-exported. A receiver in somebody else's app imports one by leaf
+  path, which is where their code lives anyway. Module scope is fine in a module
+  the root does not reach eagerly, which is why `delivery_targets` and
+  `note_successful_delivery` import events at module scope. **Adding a
+  re-export is what breaks it**, and it breaks importing the package rather
+  than the line that was added.
 - **`ty` cannot see a foreign key's implicit `<fk>_id`**, because Django creates
   it at runtime and ty has no Django support. Do not reach for django-stubs, a
   newer ty, a config setting or a different declaration style; all four were

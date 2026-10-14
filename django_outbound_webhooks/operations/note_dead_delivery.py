@@ -9,6 +9,7 @@ from django.db.models import F
 from django.utils import timezone
 from django_domain_events import fire
 
+from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.operations.endpoint_disabled import EndpointDisabled
 from django_outbound_webhooks.operations.endpoint_failing import EndpointFailing
 from django_outbound_webhooks.settings import setting
@@ -48,15 +49,6 @@ def note_dead_delivery(endpoint_id: int) -> bool:
     here would let two of them see zero and warn twice.
     """
     threshold = setting("AUTO_DISABLE_AFTER_DEAD_DELIVERIES")
-
-    # Inside the function, like every model import in this package. Django
-    # imports an app's package before the app registry is ready, so a
-    # module-scope model import anywhere reachable from the package root raises
-    # AppRegistryNotReady. This module is not re-exported today, which makes the
-    # rule look optional here -- it is not: keeping it uniform is what stops a
-    # re-export added later from breaking the package's importability, which is
-    # a failure that surfaces nowhere near the line that caused it.
-    from django_outbound_webhooks.models.endpoint import Endpoint
 
     # One transaction for the increment, the switch-off and the event. The event
     # is written by fire() into whatever transaction is open, so an

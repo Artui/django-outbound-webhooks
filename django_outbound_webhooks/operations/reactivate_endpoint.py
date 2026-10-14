@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from django_outbound_webhooks.models.endpoint import Endpoint
+from django_outbound_webhooks.models.endpoint import Endpoint
 
 
 def reactivate_endpoint(endpoint: Endpoint) -> Endpoint:

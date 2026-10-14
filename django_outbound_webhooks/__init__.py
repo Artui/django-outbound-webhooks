@@ -1,20 +1,34 @@
 """Outbound webhooks for Django, delivered as a durable receiver."""
 
-from django_outbound_webhooks.endpoints.endpoints_for import endpoints_for
-from django_outbound_webhooks.endpoints.pinned_format import pinned_format
-from django_outbound_webhooks.endpoints.register_endpoint import register_endpoint
+import importlib
+
 from django_outbound_webhooks.formats.body_format import BodyFormat
 from django_outbound_webhooks.formats.cloud_events_v1 import CloudEventsV1
 from django_outbound_webhooks.formats.envelope_v1 import EnvelopeV1
 from django_outbound_webhooks.formats.format_registry import FormatRegistry, formats
-from django_outbound_webhooks.operations.reactivate_endpoint import reactivate_endpoint
-from django_outbound_webhooks.operations.replay_delivery import ReplayRefused, replay_delivery
-from django_outbound_webhooks.operations.rotate_secret import rotate_secret
 from django_outbound_webhooks.signing.sign_request import sign_request
-from django_outbound_webhooks.signing.signing_secrets import signing_secrets
 from django_outbound_webhooks.types.format_id import FormatId
 from django_outbound_webhooks.types.rendered_body import RenderedBody
 from django_outbound_webhooks.version import __version__
+
+# The names below are served lazily, on first attribute access, rather than
+# imported here. Each one reaches the model layer when its module is imported,
+# and Django imports this package while it is still loading apps, before models
+# may be imported. Importing them eagerly here made the package unimportable
+# with AppRegistryNotReady. A consumer sees the same names: `from
+# django_outbound_webhooks import register_endpoint` resolves through the
+# __getattr__ below, and the static types for them come from __init__.pyi.
+# Adding one of them back as a plain import is what breaks the package.
+_LAZY_EXPORTS: dict[str, str] = {
+    "ReplayRefused": "django_outbound_webhooks.operations.replay_delivery",
+    "endpoints_for": "django_outbound_webhooks.endpoints.endpoints_for",
+    "pinned_format": "django_outbound_webhooks.endpoints.pinned_format",
+    "reactivate_endpoint": "django_outbound_webhooks.operations.reactivate_endpoint",
+    "register_endpoint": "django_outbound_webhooks.endpoints.register_endpoint",
+    "replay_delivery": "django_outbound_webhooks.operations.replay_delivery",
+    "rotate_secret": "django_outbound_webhooks.operations.rotate_secret",
+    "signing_secrets": "django_outbound_webhooks.signing.signing_secrets",
+}
 
 # The two field validators are deliberately NOT re-exported, here or from their
 # own subpackages. Django writes a field's validators into the migration as a
@@ -57,3 +71,22 @@ __all__ = [
     "sign_request",
     "signing_secrets",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """Resolve a lazily exported name from its leaf module, and cache the result.
+
+    PEP 562 hook: runs only for names not already bound on this module, so the
+    first access imports the leaf and every later access is a plain lookup.
+    """
+    module_path = _LAZY_EXPORTS.get(name)
+    if module_path is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(importlib.import_module(module_path), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """List every public name, lazy ones included, so tab completion sees them."""
+    return sorted(set(globals()) | set(__all__))
