@@ -1,15 +1,3 @@
-"""Who may run an action, which Django gets wrong by default.
-
-The hazard both ModelAdmins here guard against: an action declared without
-``permissions=`` is offered to **anyone who can reach the changelist**, which
-includes view-only staff, and ``has_change_permission`` gates the form rather
-than the action, so refusing there refuses nothing.
-
-Every test drives the changelist with the test client rather than calling the
-action method. Calling it directly proves nothing at all: the permission check
-lives in how Django *offers* and dispatches the action, not in the method.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -42,9 +30,7 @@ def test_view_only_staff_are_not_offered_reactivate(
 def test_view_only_staff_cannot_run_reactivate_by_posting(
     client: Client, staff_user: Callable[..., User], endpoint: Endpoint
 ) -> None:
-    # The half that matters. An action absent from the dropdown is still
-    # reachable by anyone who can type a form post, so the refusal has to be in
-    # the dispatch rather than in the rendering.
+    # The half that matters.
     Endpoint.objects.filter(pk=endpoint.pk).update(
         is_active=False, disabled_at=timezone.now(), consecutive_dead_deliveries=9
     )
@@ -62,8 +48,6 @@ def test_view_only_staff_cannot_run_reactivate_by_posting(
 def test_change_permission_is_what_enables_reactivate(
     client: Client, staff_user: Callable[..., User], endpoint: Endpoint
 ) -> None:
-    # The positive case, against the same starting state, so the test above is
-    # known to be refusing rather than merely not reaching the action.
     Endpoint.objects.filter(pk=endpoint.pk).update(is_active=False)
     client.force_login(staff_user("view_endpoint", "change_endpoint"))
 
@@ -81,9 +65,6 @@ def test_reading_the_log_does_not_let_you_replay(
     logged_delivery: DeliveryAttempt,
     no_real_network: list[httpx2.Request],
 ) -> None:
-    # Replay is gated on the *endpoint's* change permission, not this table's,
-    # and this is the case that tells them apart: a support user granted every
-    # permission the log has still cannot make a delivery happen.
     client.force_login(staff_user("view_deliveryattempt", "change_deliveryattempt"))
 
     before = len(no_real_network)

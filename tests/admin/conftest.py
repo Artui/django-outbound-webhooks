@@ -1,5 +1,3 @@
-"""Fixtures for driving the admin as a real user would."""
-
 from __future__ import annotations
 
 import base64
