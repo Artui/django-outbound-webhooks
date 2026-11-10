@@ -42,11 +42,10 @@ def test_the_validator_paths_the_migration_uses_still_resolve() -> None:
 
 
 def test_no_migration_is_missing() -> None:
-    # The endpoint model gained four columns for rotation and endpoint health,
-    # which is the moment this stops being theoretical: a field added without a migration passes every test in
-    # the suite, because the test database is built from the models rather than
-    # by migrating. It fails on somebody's deployment instead, as a column that
-    # does not exist.
+    # The endpoint model gained four columns for rotation and endpoint health, which is the moment
+    # this stops being theoretical: a field added without a migration passes every test in the
+    # suite, because the test database is built from the models rather than by migrating. It fails
+    # on somebody's deployment instead, as a column that does not exist.
     from django.core.management import call_command
 
     call_command("makemigrations", "django_outbound_webhooks", "--check", "--dry-run", verbosity=0)

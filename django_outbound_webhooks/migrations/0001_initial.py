@@ -38,7 +38,9 @@ class Migration(migrations.Migration):
                 (
                     "secret",
                     models.CharField(
-                        help_text="Base64, optionally with the whsec_ prefix the specification uses.",
+                        help_text=(
+                            "Base64, optionally with the whsec_ prefix the specification uses."
+                        ),
                         max_length=255,
                         validators=[
                             django_outbound_webhooks.signing.validate_signing_secret.validate_signing_secret
