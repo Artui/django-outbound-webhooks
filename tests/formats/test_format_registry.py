@@ -1,5 +1,3 @@
-"""What formats exist, and which version an endpoint may pin."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -13,12 +11,7 @@ from django_outbound_webhooks.types.rendered_body import RenderedBody
 
 
 class _Stub:
-    """A conforming format that inherits nothing.
-
-    Deliberately not a subclass of ``BodyFormat``. The protocol is structural, so
-    an operator's own format never has to import anything from this package, and
-    a stub that inherited would be testing a coupling the design does not have.
-    """
+    """A conforming format that inherits nothing."""
 
     def __init__(self, name: str, version: int) -> None:
         self.name = name
@@ -42,8 +35,6 @@ def test_a_registered_format_is_retrievable_by_its_identity(registry: FormatRegi
 
 
 def test_registering_the_same_object_twice_is_fine(registry: FormatRegistry) -> None:
-    # This is what a double import looks like, and refusing it would make the
-    # package fail on an ordinary re-entrant load rather than on a real mistake.
     stub = _Stub("envelope", 1)
     registry.register(stub)
     registry.register(stub)
@@ -51,9 +42,7 @@ def test_registering_the_same_object_twice_is_fine(registry: FormatRegistry) -> 
 
 
 def test_replacing_a_published_version_is_refused(registry: FormatRegistry) -> None:
-    # The whole point of pinning. Silently swapping the renderer behind
-    # envelope@1 changes what an integrated consumer receives, under a
-    # signature that still verifies.
+    # The whole point of pinning.
     registry.register(_Stub("envelope", 1))
     with pytest.raises(ValueError, match="already published"):
         registry.register(_Stub("envelope", 1))
@@ -71,8 +60,6 @@ def test_a_new_version_of_a_published_family_is_allowed(registry: FormatRegistry
 def test_an_unpublished_identity_fails_closed_and_names_what_exists(
     registry: FormatRegistry,
 ) -> None:
-    # Never a fallback to the current version: that would deliver a shape the
-    # consumer never integrated against, which is what pinning prevents.
     registry.register(_Stub("envelope", 1))
     with pytest.raises(LookupError, match=r"envelope@2.*Published: envelope@1"):
         registry.get(FormatId(name="envelope", version=2))
@@ -108,7 +95,6 @@ def test_latest_on_an_empty_registry_says_none(registry: FormatRegistry) -> None
 
 def test_published_is_ordered_by_family_then_version(registry: FormatRegistry) -> None:
     # An operator reads this to decide whether an old version can be retired.
-    # An arbitrary order makes two runs of one census disagree.
     registry.register(_Stub("envelope", 2))
     registry.register(_Stub("cloudevents", 1))
     registry.register(_Stub("envelope", 1))
@@ -126,34 +112,22 @@ def test_clear_empties_it(registry: FormatRegistry) -> None:
 
 
 def test_the_app_publishes_the_built_in_envelope() -> None:
-    # The process-wide registry, populated by WebhooksConfig.ready(). If the
-    # app config stopped registering, every delivery would fail closed rather
-    # than silently pick a format, and this is what says so.
+    # The process-wide registry, populated by WebhooksConfig.ready().
     assert FormatId(name="envelope", version=1) in formats.published()
 
 
 def test_an_object_inheriting_nothing_is_accepted(registry: FormatRegistry) -> None:
-    # The point of the protocol. _Stub imports RenderedBody because it returns
-    # one, and nothing else from this package.
+    # The point of the protocol.
     assert isinstance(_Stub("envelope", 1), BodyFormat)
     registry.register(_Stub("envelope", 1))
 
 
 def test_inheriting_the_protocol_still_refuses_a_missing_render() -> None:
-    # A protocol member with a bare `...` body is not abstract, so without the
-    # @abstractmethod decorator this class would instantiate happily and fail at
-    # delivery time. Anyone who does choose to inherit gets the refusal an
-    # abstract base class would have given them.
     class Forgot(BodyFormat):
         name = "forgot"
         version = 1
 
-    # Matched loosely on purpose. CPython words this differently across the
-    # supported range -- "with abstract method render" before 3.12, "without an
-    # implementation for abstract method 'render'" from 3.12 -- so pinning the
-    # phrasing makes the test an assertion about the interpreter's wording
-    # rather than about this package. What matters is that it refuses, and that
-    # it names the member.
+    # Matched loosely on purpose.
     with pytest.raises(TypeError, match=r"abstract method '?render'?"):
         Forgot()
 
