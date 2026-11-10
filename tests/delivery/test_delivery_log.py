@@ -1,5 +1,3 @@
-"""The delivery log, and the half of it that only exists because of the hook."""
-
 from __future__ import annotations
 
 import base64
@@ -88,12 +86,7 @@ def test_a_successful_delivery_logs_one_row(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_a_failed_delivery_is_logged_at_all(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The reason the substrate grew a failure hook.
-
-    A receiver's writes are discarded the moment it raises, so before the hook
-    this table would have held successes and nothing else -- which is the half
-    an operator does not need.
-    """
+    """The reason the substrate grew a failure hook."""
     _endpoint()
     _answering(monkeypatch, [410])
     _fire_and_drain()
@@ -108,17 +101,7 @@ def test_a_failed_delivery_is_logged_at_all(monkeypatch: pytest.MonkeyPatch) -> 
 def test_a_permanent_refusal_still_costs_the_whole_outer_budget(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The log makes a known gap visible, which is half of what a log is for.
-
-    410 Gone stops the inner tier after one request, because a webhook's verdict
-    is a return value and the policy can read it. The substrate can only retry
-    what raises and cannot be told a failure is terminal, so it re-delivers to
-    the attempt budget regardless: one request per outer attempt, five times,
-    to an endpoint that has already said it is retired.
-
-    That is the first of the findings this package owes back, and until it is
-    fixed the log is where an operator can see it happening.
-    """
+    """The log makes a known gap visible, which is half of what a log is for."""
     _endpoint()
     _answering(monkeypatch, [410])
     _fire_and_drain()
@@ -143,8 +126,7 @@ def test_the_inner_attempts_of_one_delivery_are_all_recorded(
 
 
 def test_the_two_numbers_count_different_tiers(monkeypatch: pytest.MonkeyPatch) -> None:
-    # They multiply rather than add. A log calling either of them "attempt"
-    # would make every number in it ambiguous.
+    # They multiply rather than add.
     _endpoint()
     _answering(monkeypatch, [500])
     _fire_and_drain(times=4)
@@ -159,8 +141,6 @@ def test_the_two_numbers_count_different_tiers(monkeypatch: pytest.MonkeyPatch) 
 def test_every_attempt_of_one_delivery_records_the_same_body_hash(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The hash is what makes a re-render that disagrees with the signed original
-    # a findable event rather than a customer-side mystery.
     _endpoint()
     seen = _answering(monkeypatch, [503, 503, 200])
     _fire_and_drain()
@@ -193,9 +173,7 @@ def test_a_transport_error_records_the_error_and_no_status(
 def test_a_delivery_that_never_made_a_request_logs_nothing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # A deleted endpoint, a pruned event, a format that was never published. The
-    # substrate's own row already records those; an empty attempt row here would
-    # invent a request that was never made.
+    # A deleted endpoint, a pruned event, a format that was never published.
     endpoint = _endpoint()
     _answering(monkeypatch, [200])
     Endpoint.objects.filter(pk=endpoint.pk).update(is_active=False)
@@ -205,8 +183,7 @@ def test_a_delivery_that_never_made_a_request_logs_nothing(
 
 
 def test_deleting_an_endpoint_keeps_its_history(monkeypatch: pytest.MonkeyPatch) -> None:
-    # A log whose rows disappear with the thing they are evidence about is not
-    # a log. The URL is denormalised for the same reason.
+    # A log whose rows disappear with the thing they are evidence about is not a log.
     endpoint = _endpoint()
     _answering(monkeypatch, [200])
     _fire_and_drain()
@@ -250,34 +227,19 @@ def test_a_response_body_is_truncated(monkeypatch: pytest.MonkeyPatch, settings:
 def test_a_failure_before_any_request_logs_nothing(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """The failure path's own version of "no request was made".
-
-    A pruned source event, a format that was never published: the delivery
-    raises before the first POST, so the hook runs with nothing to write. The
-    substrate's own row already records why, and an empty attempt row here would
-    invent a request that never happened.
-    """
+    """The failure path's own version of "no request was made"."""
     endpoint = _endpoint()
     _answering(monkeypatch, [200])
 
-    # Pin the endpoint to a version nothing published, past register_endpoint's
-    # validation. Firing freezes it onto the delivery's target and the delivery
-    # then fails closed at render time, before any request.
     Endpoint.objects.filter(pk=endpoint.pk).update(format_version=9)
     with caplog.at_level(logging.ERROR):
         _fire_and_drain()
 
     assert DeliveryAttempt.objects.count() == 0
-    # And the hook did not blow up getting there. The substrate swallows a
-    # raising hook by design, so "no rows" alone is satisfied both by the guard
-    # working and by the hook crashing on the way in -- which is how a bug here
-    # would stay invisible. Only the absence of that log line separates them.
     assert "on_failure hook" not in caplog.text
 
 
 def test_the_stash_does_not_leak_between_deliveries(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Both paths clear it, so a delivery that raises before setting it cannot
-    # inherit the previous one's attempts and log them against the wrong id.
     from django_outbound_webhooks.delivery.pending_attempts import pending_attempts
 
     _endpoint()

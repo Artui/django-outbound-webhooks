@@ -1,5 +1,3 @@
-"""Reading a status code as a verdict."""
-
 from __future__ import annotations
 
 import pytest
@@ -26,15 +24,12 @@ def test_the_two_4xx_that_mean_later(status: int) -> None:
 
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 410, 422, 451])
 def test_every_other_4xx_is_permanent(status: int) -> None:
-    # 410 Gone is the specification's retirement signal, and the rest are no
-    # better: a malformed body or a refused credential is identical next time.
     assert classify_response(status) is DeliveryVerdict.PERMANENT
 
 
 @pytest.mark.parametrize("status", [100, 101, 301, 302, 307, 308])
 def test_1xx_and_3xx_are_permanent_rather_than_retried(status: int) -> None:
-    # The client follows redirects itself, so a 3xx arriving here means the
-    # budget ran out. Neither heals on a retry.
+    # The client follows redirects itself, so a 3xx arriving here means the budget ran out.
     assert classify_response(status) is DeliveryVerdict.PERMANENT
 
 

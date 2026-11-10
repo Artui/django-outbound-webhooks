@@ -1,5 +1,3 @@
-"""Delivering one endpoint's copy, and the three ways it does not."""
-
 from __future__ import annotations
 
 import base64
@@ -43,8 +41,7 @@ def _source() -> EventRecord:
 
 
 def _context(endpoint: Endpoint, source: EventRecord, **overrides: object) -> DeliveryContext:
-    """The context the substrate hands the receiver, built the way it builds it:
-    off the event row, with the target the row was written with."""
+    """The receiver's context, built off the event row and its written target."""
     fields: dict[str, object] = {
         "endpoint_id": endpoint.pk,
         "format_name": "envelope",
@@ -84,8 +81,7 @@ def test_it_posts_a_body_the_specification_verifies(
 def test_a_deactivated_endpoint_is_not_posted_to_and_does_not_raise(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    # The customer switched it off. Raising would retry a destination they
-    # removed on purpose; returning is what says nothing is owed.
+    # The customer switched it off.
     endpoint, source = _endpoint(), _source()
     Endpoint.objects.filter(pk=endpoint.pk).update(is_active=False)
     deliver_due(EVENT, _context(endpoint, source))
@@ -114,10 +110,7 @@ def test_a_format_version_that_was_never_published_fails_closed(
 def test_a_refusal_raises_so_the_substrate_decides(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Raising is the only thing the substrate reads. It cannot be told a failure
-    # is terminal, so a permanent verdict still burns the attempt budget before
-    # dead-lettering: wasteful, correct in the end, and the first finding this
-    # package owes back.
+    # Raising is the only thing the substrate reads.
     def factory() -> httpx2.Client:
         return httpx2.Client(transport=httpx2.MockTransport(lambda request: httpx2.Response(410)))
 
@@ -130,9 +123,6 @@ def test_a_refusal_raises_so_the_substrate_decides(
 def test_end_to_end_a_fired_event_reaches_the_endpoint(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    # The composed path, which is the only place the targets callable and the
-    # delivery are exercised as one thing: fire, drain once, and a stranger's
-    # server has the bytes. One drain, because there is no second hop.
     _endpoint()
     with transaction.atomic():
         fire(OrderPlaced(order_id=99, total_cents=4200))
@@ -146,14 +136,7 @@ def test_end_to_end_a_fired_event_reaches_the_endpoint(
 def test_the_pinned_format_decides_the_body_and_the_content_type(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    """The seam, end to end: a second format changes the wire and nothing else.
-
-    Everything between rendering and sending is format-blind -- the signature
-    is over whatever bytes came back, and the content type travels with them
-    rather than being fixed by the sender. That is easy to write and easy to
-    get wrong in a way only a second format can show, because with one format
-    a hardcoded `application/json` is indistinguishable from a read.
-    """
+    """The seam, end to end: a second format changes the wire and nothing else."""
     endpoint, source = _endpoint(), _source()
     deliver_due(EVENT, _context(endpoint, source, format_name="cloudevents", format_version=1))
 
@@ -197,9 +180,7 @@ def test_a_retry_after_is_handed_to_the_substrate_as_its_schedule(
 def test_end_to_end_the_next_outer_attempt_is_when_the_endpoint_asked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The rows, not the exception: one request, one attempt counted, the
-    delivery scheduled two minutes out rather than on the backoff curve, and the
-    refusal in the log."""
+    """The rows, not the exception: one attempt counted, retry two minutes out."""
     seen = _rate_limited(monkeypatch, "120")
     _endpoint()
     with transaction.atomic():
