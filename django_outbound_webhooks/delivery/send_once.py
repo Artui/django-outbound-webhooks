@@ -1,5 +1,3 @@
-"""One HTTP attempt at one delivery."""
-
 from __future__ import annotations
 
 import time
@@ -27,28 +25,7 @@ def send_once(
     message_id: str,
     body: RenderedBody,
 ) -> AttemptOutcome:
-    """Post the body once and read the answer as a verdict.
-
-    The body arrives already rendered rather than being rendered here, and that
-    is deliberate: every attempt of one delivery has to send **byte-identical**
-    content. ``webhook-id`` is stable across attempts and is what a receiver
-    deduplicates on, so two different bodies under one id leave the customer in
-    a state that depends on which attempt landed.
-
-    The timestamp is fresh on each attempt, which is correct and is the one
-    thing that legitimately differs: receivers verify it against a tolerance
-    window, so a retry an hour later would be rejected as too old if it reused
-    the original.
-
-    Returns the whole outcome rather than a bare verdict, because the delivery
-    log needs what the endpoint said and how long it took, and this is the only
-    place that knows either.
-
-    A transport error becomes ``RETRY`` rather than propagating. A refused
-    connection or a timeout is the most ordinary transient failure there is, and
-    letting it raise would hand the decision to the outer tier, which cannot
-    tell it apart from a bug in this package.
-    """
+    """Post the body once and read the answer as a verdict."""
     headers = sign_request(
         secrets=secrets,
         message_id=message_id,

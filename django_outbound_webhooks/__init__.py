@@ -1,5 +1,3 @@
-"""Outbound webhooks for Django, delivered as a durable receiver."""
-
 import importlib
 
 from django_outbound_webhooks.formats.body_format import BodyFormat
@@ -74,11 +72,7 @@ __all__ = [
 
 
 def __getattr__(name: str) -> object:
-    """Resolve a lazily exported name from its leaf module, and cache the result.
-
-    PEP 562 hook: runs only for names not already bound on this module, so the
-    first access imports the leaf and every later access is a plain lookup.
-    """
+    """Resolve a lazily exported name from its leaf module, and cache the result."""
     module_path = _LAZY_EXPORTS.get(name)
     if module_path is None:
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

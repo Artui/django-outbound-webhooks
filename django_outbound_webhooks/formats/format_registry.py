@@ -1,5 +1,3 @@
-"""What formats exist, and which version an endpoint may pin."""
-
 from __future__ import annotations
 
 import inspect
@@ -17,20 +15,7 @@ _RENDER_KEYWORDS = ("message_id", "event_name", "occurred_at", "payload")
 
 
 def _require_conforming(body_format: BodyFormat) -> None:
-    """Refuse an object that cannot serve as a body format, at registration.
-
-    Neither of the type-level tools does this job. ``isinstance`` against a
-    runtime-checkable protocol tests attribute *presence* only, so a ``render``
-    with entirely the wrong keywords satisfies it; and a protocol demands no
-    inheritance, so there is no constructor anywhere to enforce a shape. The
-    checker catches this for code it can see, and an operator's format lives in
-    a project it cannot.
-
-    The parameter is annotated as the thing this function verifies, which reads
-    as circular and is the usual arrangement: the annotation says what the
-    caller believes it is passing, and the body is what establishes whether that
-    was true.
-    """
+    """Refuse an object that cannot serve as a body format, at registration."""
     for attribute in ("name", "version", "render"):
         if not hasattr(body_format, attribute):
             raise TypeError(
@@ -65,27 +50,13 @@ def _require_conforming(body_format: BodyFormat) -> None:
 
 
 class FormatRegistry:
-    """The published body formats, keyed by name and version.
-
-    Operator-owned. A customer *selects* from what is registered here and can
-    never add to it: a customer-supplied renderer is an injection surface, and
-    it would sit directly against the boundary that decides whose payload
-    reaches whose URL.
-    """
+    """The published body formats, keyed by name and version."""
 
     def __init__(self) -> None:
         self._formats: dict[FormatId, BodyFormat] = {}
 
     def register(self, body_format: BodyFormat) -> None:
-        """Publish one version of one format.
-
-        Registering the same identity twice with a *different* object is
-        refused rather than tolerated. Once an endpoint pins ``envelope@1``,
-        that identity names the bytes it integrated against, so silently
-        replacing the renderer behind it would change what an existing consumer
-        receives under a signature that still verifies. Re-registering the same
-        object is fine and is what a double import looks like.
-        """
+        """Publish one version of one format."""
         _require_conforming(body_format)
         identity = FormatId(name=body_format.name, version=body_format.version)
         existing = self._formats.get(identity)
@@ -98,13 +69,7 @@ class FormatRegistry:
         self._formats[identity] = body_format
 
     def get(self, identity: FormatId) -> BodyFormat:
-        """The renderer for one pinned identity, or a refusal naming what exists.
-
-        Fails closed. An endpoint pinned to something unpublished must not fall
-        back to a current version: that would deliver a shape the consumer never
-        integrated against, which is the exact outcome pinning exists to
-        prevent.
-        """
+        """The renderer for one pinned identity, or a refusal naming what exists."""
         body_format = self._formats.get(identity)
         if body_format is None:
             published = ", ".join(str(known) for known in self.published()) or "nothing"
@@ -112,12 +77,7 @@ class FormatRegistry:
         return body_format
 
     def latest(self, name: str) -> FormatId:
-        """The newest published version of one format family.
-
-        This is what a registration with no stated version pins *to*, and the
-        answer is recorded on the endpoint rather than re-derived, so the
-        endpoint stops moving the moment it is created.
-        """
+        """The newest published version of one format family."""
         versions = [known for known in self._formats if known.name == name]
         if not versions:
             families = ", ".join(sorted({known.name for known in self._formats})) or "none"
@@ -125,12 +85,7 @@ class FormatRegistry:
         return max(versions, key=lambda known: known.version)
 
     def published(self) -> list[FormatId]:
-        """Every published identity, oldest family and version first.
-
-        Sorted because this is what an operator reads when deciding whether a
-        version can be retired, and an arbitrary order makes two runs of the
-        same census disagree.
-        """
+        """Every published identity, oldest family and version first."""
         return sorted(self._formats, key=lambda known: (known.name, known.version))
 
     def clear(self) -> None:

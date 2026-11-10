@@ -1,10 +1,3 @@
-"""Settings this package reads, and their defaults.
-
-One namespaced dict rather than a scatter of top-level names, so a project can
-see everything this package reads in one place and a typo in a key raises here
-rather than silently taking a default.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -89,10 +82,6 @@ DEFAULTS: dict[str, Any] = {
 
 
 def setting(key: str) -> Any:
-    """One configured value, falling back to the default.
-
-    ``DEFAULTS[key]`` rather than ``.get(key)``: an unknown key is a typo in
-    this package, and a KeyError here beats a None that travels.
-    """
+    """One configured value, falling back to the default."""
     configured = getattr(settings, SETTINGS_NAME, {})
     return configured.get(key, DEFAULTS[key])

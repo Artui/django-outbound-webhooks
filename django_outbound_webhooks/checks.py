@@ -1,5 +1,3 @@
-"""System checks for wiring that fails silently."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -11,29 +9,7 @@ from django_outbound_webhooks.settings import setting
 
 
 def check_default_format_is_published(app_configs: Any, **kwargs: Any) -> list[Warning]:
-    """Warn when the format new endpoints would pin does not exist.
-
-    Registered by ``WebhooksConfig.ready``, not by a decorator here: nothing in
-    a running project imports this module, so a decorator would register the
-    check only in a process that happened to import it, which is the test suite
-    and no deployment.
-
-    ``DEFAULT_FORMAT`` is read at registration, not at startup, so a value
-    naming nothing sits quietly until the first customer registers an endpoint
-    and then raises there -- in a request, on their side of the product, for a
-    configuration mistake made on ours.
-
-    The likeliest way to reach it is not a typo. ``cloudevents`` is published
-    only when ``CLOUDEVENTS_SOURCE`` is set, so a deployment that names it as
-    the default and forgets the source has a default that is spelled correctly
-    and does not exist. The hint says so rather than describing it as a typo,
-    because the reader is probably looking straight at the name they meant.
-
-    A ``Warning`` rather than an ``Error``: nothing already registered is
-    affected -- an endpoint pins its own format and keeps delivering -- so this
-    must not be allowed to stop ``migrate`` on a deployment whose existing
-    customers are fine.
-    """
+    """Warn when the format new endpoints would pin does not exist."""
     default = setting("DEFAULT_FORMAT")
     families = sorted({identity.name for identity in formats.published()})
     if default in families:
