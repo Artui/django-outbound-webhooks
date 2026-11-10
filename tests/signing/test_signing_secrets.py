@@ -1,5 +1,3 @@
-"""Which secrets an endpoint's deliveries are signed with."""
-
 from __future__ import annotations
 
 from datetime import timedelta
@@ -33,11 +31,7 @@ def test_a_closed_window_does_not() -> None:
 
 
 def test_a_blank_previous_secret_is_never_signed_with() -> None:
-    # An inconsistent row: an expiry standing over no secret. rotate_secret
-    # cannot write one, but a column is editable by anything with a database
-    # connection, and without the first half of the condition every delivery
-    # would carry a second signature made with the empty string -- which the
-    # customer cannot verify and nobody can explain.
+    # An inconsistent row: an expiry standing over no secret.
     endpoint = Endpoint(
         secret="new",
         previous_secret="",
@@ -47,8 +41,6 @@ def test_a_blank_previous_secret_is_never_signed_with() -> None:
 
 
 def test_a_previous_secret_with_no_window_is_never_signed_with() -> None:
-    # The other inconsistent row, and the other half of the condition. A secret
-    # left behind with no expiry would otherwise be offered forever, which is a
-    # rotation that never finishes.
+    # The other inconsistent row, and the other half of the condition.
     endpoint = Endpoint(secret="new", previous_secret="old", previous_secret_expires_at=None)
     assert signing_secrets(endpoint) == ["new"]
