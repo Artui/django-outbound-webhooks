@@ -1,5 +1,3 @@
-"""The attempts one delivery has made, waiting to be written."""
-
 from __future__ import annotations
 
 from contextvars import ContextVar

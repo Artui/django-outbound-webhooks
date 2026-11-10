@@ -1,5 +1,3 @@
-"""The one delivery a replay is for, while the substrate re-derives targets."""
-
 from __future__ import annotations
 
 from contextvars import ContextVar

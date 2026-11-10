@@ -1,5 +1,3 @@
-"""Write one delivery's attempts to the log."""
-
 from __future__ import annotations
 
 from django_outbound_webhooks.delivery.pending_attempts import PendingAttempts
@@ -7,13 +5,7 @@ from django_outbound_webhooks.models.delivery_attempt import DeliveryAttempt
 
 
 def record_attempts(pending: PendingAttempts) -> int:
-    """Write a row per HTTP request, and return how many.
-
-    Called from two places that cannot be merged: the receiver itself when the
-    delivery succeeded, and the substrate's failure hook when it did not. The
-    split is not tidiness -- a receiver's writes are discarded the moment it
-    raises, so the attempts most worth recording are the ones it cannot record.
-    """
+    """Write a row per HTTP request, and return how many."""
     rows = [
         DeliveryAttempt(
             message_id=pending.target.message_id,

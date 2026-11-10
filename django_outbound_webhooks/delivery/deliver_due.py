@@ -1,5 +1,3 @@
-"""Render, sign and send one endpoint's copy of an event."""
-
 from __future__ import annotations
 
 import hashlib
@@ -30,35 +28,14 @@ RECEIVER_KEY = "django_outbound_webhooks.deliver"
 
 
 class DeliveryFailed(Exception):
-    """One delivery did not succeed, and the substrate should decide what next.
-
-    Raised rather than returned because raising is the only thing the substrate
-    reads. It cannot be told a failure is terminal, so a permanent verdict still
-    burns the attempt budget before dead-lettering -- wasteful, correct in the
-    end, and the first of the findings this package owes back.
-    """
+    """One delivery did not succeed, and the substrate should decide what next."""
 
 
 def deliver_due(event: object, context: DeliveryContext) -> None:
-    """Deliver one endpoint's copy of one event, or raise so the substrate retries it.
-
-    The receiver for every event, declared for ``AnyEvent``: ``context.target``
-    says which endpoint this delivery is for and carries the recipe frozen when
-    the event was fired. The decoded ``event`` is not what is rendered. The body
-    is built from the event *row*, whose payload is written once and never
-    edited, so every attempt and every replay renders the same bytes that a
-    format version promises.
-
-    The row is always there. This delivery row belongs to it, and the substrate
-    prunes only events with nothing left owed, so the case a separate delivery
-    event once had to refuse - its source pruned while it waited - cannot arise.
-    """
+    """Deliver one endpoint's copy of one event, or raise so the substrate retries it."""
     target = DeliveryTarget.decode(context.target)
     endpoint = Endpoint.objects.filter(pk=target.endpoint_id).first()
     if endpoint is None or not endpoint.is_active:
-        # Deleted or switched off since the event was fired. Nothing is owed,
-        # and returning quietly is what says so: raising would retry a delivery
-        # whose destination the customer removed on purpose.
         return
 
     source = EventRecord.objects.get(pk=context.event_id)
@@ -71,9 +48,6 @@ def deliver_due(event: object, context: DeliveryContext) -> None:
     )
 
     outcomes: list[AttemptOutcome] = []
-    # Set before the first request, and never cleared here. The failure hook
-    # runs after this function has already raised, so clearing on the way out
-    # would empty it before its only reader looks.
     pending = PendingAttempts(
         target=target,
         source_event_id=source.pk,
@@ -98,13 +72,7 @@ def deliver_due(event: object, context: DeliveryContext) -> None:
         )
 
     if final.verdict is not DeliveryVerdict.SUCCEEDED:
-        # The log is written by the failure hook instead, from outside the
-        # transaction this raise is about to roll back.
         if final.retry_after_seconds is not None:
-            # The endpoint named a time, so the substrate schedules the next
-            # outer attempt for it instead of guessing on its backoff curve. It
-            # still counts as an attempt, so an endpoint refusing forever still
-            # dead-letters within the budget, and the substrate caps the wait.
             raise RetryAfter(
                 seconds=final.retry_after_seconds,
                 reason=(
@@ -119,13 +87,6 @@ def deliver_due(event: object, context: DeliveryContext) -> None:
             f"{len(outcomes)} request(s)."
         )
 
-    # Read back through a local rather than the context variable: the variable's
-    # type is optional and this one is not, and asserting it here would be
-    # asserting something this function just did.
     record_attempts(pending)
-    # The endpoint answered, so whatever it was doing before does not count
-    # towards auto-disable any more. Inside the receiver rather than beside it:
-    # this write belongs to the same transaction as the log rows, and a reset
-    # that survived a rolled-back delivery would forgive a failure that stood.
     note_successful_delivery(endpoint)
     pending_attempts.set(None)
