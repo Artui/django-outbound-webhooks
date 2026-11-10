@@ -1,10 +1,3 @@
-"""The inputs every published format is rendered against for its golden fixture.
-
-Shared by the fixture generator in ``scripts/`` and by the test that verifies
-the checked-in bytes, so the two cannot drift into rendering different inputs
-and agreeing anyway.
-"""
-
 from __future__ import annotations
 
 from typing import Any

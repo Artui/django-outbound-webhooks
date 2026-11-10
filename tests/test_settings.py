@@ -1,5 +1,3 @@
-"""Reading configuration, and refusing a key this package does not define."""
-
 from __future__ import annotations
 
 import pytest
@@ -19,14 +17,11 @@ def test_a_configured_key_wins() -> None:
 
 @override_settings(DJANGO_OUTBOUND_WEBHOOKS={"DEFAULT_FORMAT": "cloudevents"})
 def test_a_partial_configuration_still_defaults_the_rest() -> None:
-    # A project that sets one key must not lose the others. This is the reason
-    # the lookup is per-key rather than a dict merge done once at import.
+    # A project that sets one key must not lose the others.
     assert setting("DEFAULT_FORMAT") == "cloudevents"
     assert set(DEFAULTS) >= {"DEFAULT_FORMAT"}
 
 
 def test_an_unknown_key_raises_rather_than_returning_none() -> None:
-    # An unknown key is a typo inside this package, and a None travelling
-    # onwards would surface somewhere unrelated.
     with pytest.raises(KeyError):
         setting("NO_SUCH_SETTING")
