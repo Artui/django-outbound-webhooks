@@ -1,5 +1,3 @@
-"""The bytes a format produced."""
-
 from __future__ import annotations
 
 import pytest
@@ -14,8 +12,6 @@ def test_it_carries_bytes_and_a_content_type() -> None:
 
 
 def test_an_empty_body_is_allowed() -> None:
-    # A format is entitled to render nothing; what it is not entitled to do is
-    # leave the receiver guessing how to read it.
     assert RenderedBody(body=b"", content_type="application/json").body == b""
 
 

@@ -1,5 +1,3 @@
-"""The frozen recipe a delivery row carries as its target."""
-
 from __future__ import annotations
 
 from django_outbound_webhooks.types.delivery_target import DeliveryTarget
@@ -14,8 +12,7 @@ def test_it_round_trips() -> None:
 
 
 def test_the_encoding_is_compact_readable_json() -> None:
-    """An operator reads it in the substrate's admin, and a delimiter could not
-    promise an operator-chosen format name never contains it."""
+    """An operator reads it in admin, and a delimiter cannot promise the name is clean."""
     assert TARGET.encode() == (
         '{"endpoint":42,"format":"envelope","version":1,"message":"msg_abc"}'
     )

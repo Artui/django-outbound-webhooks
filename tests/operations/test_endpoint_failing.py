@@ -1,5 +1,3 @@
-"""The event fired when an endpoint's deliveries start dying."""
-
 from __future__ import annotations
 
 from django_domain_events import registry
@@ -9,8 +7,6 @@ from django_outbound_webhooks.operations.endpoint_failing import EndpointFailing
 
 
 def test_it_is_declared_under_this_app_label() -> None:
-    # The name is what an operator's receiver declares itself against and what
-    # a stored row carries, so it is part of the contract.
     entry = registry.event_for_class(EndpointFailing)
     assert entry is not None
     assert entry.name == "django_outbound_webhooks.EndpointFailing"

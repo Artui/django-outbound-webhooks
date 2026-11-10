@@ -1,5 +1,3 @@
-"""Replaying a logged delivery, and the five things that stop one."""
-
 from __future__ import annotations
 
 import base64
@@ -54,9 +52,6 @@ def test_it_delivers_again_under_a_new_id(no_real_network: list[httpx2.Request])
     replayed = replay_delivery(message_id=original)
     drain_outbox()
 
-    # A new id, because a receiver deduplicates on webhook-id: replaying under
-    # the original asks a well-behaved consumer to discard exactly the delivery
-    # somebody asked for.
     assert replayed != original
     assert len(no_real_network) == 2
     assert no_real_network[1].headers["webhook-id"] == replayed
@@ -77,10 +72,7 @@ def test_the_replayed_body_carries_the_same_event(
 def test_it_is_signed_with_the_secret_in_force_now(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    # A replay is a new delivery, so it is signed the way a delivery minted now
-    # is signed. Rotating between the two is the case that tells the difference:
-    # the original body verifies only against the old secret, the replay against
-    # both, and a replay signed from the log would verify against neither.
+    # A replay is a new delivery, so it is signed the way a delivery minted now is signed.
     endpoint, original = _deliver_once()
     new_secret = base64.b64encode(b"the-secret-it-rotated-to").decode()
     rotate_secret(endpoint, new_secret=new_secret)
@@ -95,9 +87,7 @@ def test_it_is_signed_with_the_secret_in_force_now(
 def test_it_renders_the_format_the_endpoint_is_pinned_to_now(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    # The pin is the consumer's integration contract as it stands today. If an
-    # operator re-pinned the endpoint, the shape in the log is the one the
-    # customer can no longer parse.
+    # The pin is the consumer's integration contract as it stands today.
     endpoint, original = _deliver_once()
     Endpoint.objects.filter(pk=endpoint.pk).update(format_name="cloudevents", format_version=1)
 
@@ -111,8 +101,6 @@ def test_it_renders_the_format_the_endpoint_is_pinned_to_now(
 
 
 def test_the_replay_gets_its_own_log_rows(no_real_network: list[httpx2.Request]) -> None:
-    # Through the substrate like any other delivery, so it has its own delivery
-    # row, attempt budget and log rows rather than appending to the original's.
     _, original = _deliver_once()
     replayed = replay_delivery(message_id=original)
 
@@ -134,17 +122,12 @@ def test_a_deleted_endpoint_is_refused(no_real_network: list[httpx2.Request]) ->
     endpoint, original = _deliver_once()
     endpoint.delete()
 
-    # The log row survives the endpoint on purpose -- it is evidence of where a
-    # request went -- and that is not the same as a destination to send to.
     assert DeliveryAttempt.objects.filter(message_id=original).exists()
     with pytest.raises(ReplayRefused, match="has been deleted"):
         replay_delivery(message_id=original)
 
 
 def test_an_inactive_endpoint_is_refused(no_real_network: list[httpx2.Request]) -> None:
-    # Without this the replay is fired, claimed, and dropped by the receiver's
-    # own is_active check: the operator sees a successful replay and the
-    # customer receives nothing.
     endpoint, original = _deliver_once()
     Endpoint.objects.filter(pk=endpoint.pk).update(is_active=False)
 
@@ -153,8 +136,6 @@ def test_an_inactive_endpoint_is_refused(no_real_network: list[httpx2.Request]) 
 
 
 def test_a_pruned_event_is_refused(no_real_network: list[httpx2.Request]) -> None:
-    # The bytes cannot be reconstructed without the event row, so this would
-    # dead-letter after burning a whole attempt budget.
     _, original = _deliver_once()
     EventRecord.objects.filter(name="testapp.OrderPlaced").delete()
 
@@ -165,9 +146,7 @@ def test_a_pruned_event_is_refused(no_real_network: list[httpx2.Request]) -> Non
 def test_nothing_is_posted_before_the_relay_runs(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    # It writes an event and returns. A replay that posted inline would do it
-    # outside the substrate's retry, backoff and dead-lettering -- all the
-    # machinery the replay is going through the substrate to get.
+    # It writes an event and returns.
     _, original = _deliver_once()
     replay_delivery(message_id=original)
     assert len(no_real_network) == 1
@@ -176,12 +155,7 @@ def test_nothing_is_posted_before_the_relay_runs(
 def test_it_goes_only_to_the_endpoint_the_log_names(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    """Replaying one delivery is not replaying the event.
-
-    A second endpoint subscribed to the same event is exactly what the substrate
-    would re-derive if nothing narrowed it, so this is sized to tell the two
-    apart: one new row, for the logged endpoint, and one new request.
-    """
+    """Replaying one delivery is not replaying the event."""
     endpoint, original = _deliver_once()
     _endpoint(name="Globex", url="https://other.test/hooks")
 
@@ -203,8 +177,7 @@ def test_the_narrowing_ends_with_the_call(no_real_network: list[httpx2.Request])
 def test_the_narrowing_ends_even_when_the_replay_raises(
     monkeypatch: pytest.MonkeyPatch, no_real_network: list[httpx2.Request]
 ) -> None:
-    """A narrowing that outlived a failed call would steer the next replay in
-    this context to the wrong endpoint."""
+    """A narrowing that outlived a failed call would steer the next replay wrongly."""
     _, original = _deliver_once()
 
     def broken(*args: object, **kwargs: object) -> dict[str, int]:
@@ -219,8 +192,7 @@ def test_the_narrowing_ends_even_when_the_replay_raises(
 def test_an_event_that_is_no_longer_declared_is_refused(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    """The substrate skips an event it cannot rebuild without saying so, so an
-    operator would be told a replay happened when nothing was written."""
+    """An unrebuildable event is skipped aloud, never reported as a replay."""
     _, original = _deliver_once()
     EventRecord.objects.filter(name="testapp.OrderPlaced").update(name="testapp.Renamed")
 
@@ -232,12 +204,7 @@ def test_an_event_that_is_no_longer_declared_is_refused(
 def test_replaying_the_whole_event_goes_to_every_endpoint_subscribed_now(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    """The substrate's own replay, with nothing narrowing it.
-
-    It asks the receiver for its targets again, so an endpoint registered after
-    the event was fired receives it, under a new message id, and the original
-    delivery is left as it was rather than reopened.
-    """
+    """The substrate's own replay, with nothing narrowing it."""
     _, original = _deliver_once()
     _endpoint(name="Globex", url="https://other.test/hooks")
     event_id = EventRecord.objects.get(name="testapp.OrderPlaced").pk
@@ -254,14 +221,7 @@ def test_replaying_the_whole_event_goes_to_every_endpoint_subscribed_now(
 def test_it_reopens_nothing_that_belongs_to_another_receiver(
     no_real_network: list[httpx2.Request],
 ) -> None:
-    """A delivery replay is this package's business alone.
-
-    A project's own durable receiver on the same event has a settled row of its
-    own. Replaying one webhook must not hand that receiver the event again, so
-    the substrate replay is narrowed to this package's key - and this is the
-    test that can see the difference, because it gives the event a second
-    receiver to disturb.
-    """
+    """A delivery replay is this package's business alone."""
     receiver(OrderPlaced, key="tests.audit")(lambda event: None)
     try:
         _, original = _deliver_once()

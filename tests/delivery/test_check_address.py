@@ -1,5 +1,3 @@
-"""Refusing an address a webhook must not reach."""
-
 from __future__ import annotations
 
 import pytest
@@ -36,13 +34,7 @@ def test_everything_off_the_public_internet_is_refused(address: str, why: str) -
 
 
 def test_carrier_grade_nat_needs_its_own_check() -> None:
-    """The one `is_private` does not catch, which is why it is written out.
-
-    Measured rather than assumed: across every flag Python exposes,
-    100.64.0.0/10 is not private, not reserved and not anything else. It is
-    routable inside a provider's network and unreachable from the public
-    internet, which is exactly the shape of a destination worth reaching for.
-    """
+    """The one `is_private` does not catch, which is why it is written out."""
     import ipaddress
 
     assert not ipaddress.ip_address("100.64.0.1").is_private
@@ -59,8 +51,7 @@ def test_multicast_needs_its_own_check_too() -> None:
 
 
 def test_the_refusal_names_every_reason_it_matched() -> None:
-    # ::1 is loopback, private and reserved at once. An operator reading one
-    # reason would fix that one and be refused again.
+    # ::1 is loopback, private and reserved at once.
     with pytest.raises(UnsafeDestination) as raised:
         check_address("::1")
     assert "loopback" in str(raised.value) and "reserved" in str(raised.value)
@@ -86,8 +77,6 @@ class TestWithPrivateAddressesAllowed:
         ],
     )
     def test_the_hatch_does_not_open_the_dangerous_ones(self, address: str, why: str) -> None:
-        # "Let me reach localhost" is never a request to reach the metadata
-        # service. One flag granting both would put the worst outcome this
-        # package has one setting away.
+        # "Let me reach localhost" is never a request to reach the metadata service.
         with pytest.raises(UnsafeDestination, match=why):
             check_address(address)

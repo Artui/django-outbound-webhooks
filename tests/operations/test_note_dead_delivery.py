@@ -1,5 +1,3 @@
-"""Counting dead deliveries, and switching off an endpoint that has rotted."""
-
 from __future__ import annotations
 
 import base64
@@ -42,9 +40,7 @@ def test_it_counts_towards_the_threshold_without_reaching_it() -> None:
 
 @override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 3})
 def test_the_endpoint_is_disabled_on_the_threshold_and_not_before() -> None:
-    # Bracketed from both sides. An assertion that it is disabled "eventually"
-    # would pass for a threshold that fired one delivery early, which is a
-    # customer's integration stopped sooner than the operator configured.
+    # Bracketed from both sides.
     endpoint = _endpoint()
     assert [note_dead_delivery(endpoint.pk) for _ in range(3)] == [False, False, True]
     endpoint.refresh_from_db()
@@ -67,9 +63,6 @@ def test_disabling_fires_an_event_carrying_what_survives_the_row() -> None:
 
 @override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 3})
 def test_it_keeps_counting_after_the_endpoint_is_off_but_fires_once() -> None:
-    # The count is what an operator reads when deciding whether re-enabling is
-    # worth it, so it keeps rising. A second EndpointDisabled would be a second
-    # email to a customer about something that already happened.
     endpoint = _endpoint()
     for _ in range(5):
         note_dead_delivery(endpoint.pk)
@@ -93,9 +86,7 @@ def test_none_means_never_disable_and_still_counts() -> None:
 
 @override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 1})
 def test_an_endpoint_the_customer_switched_off_is_not_disabled_again() -> None:
-    # is_active is False already, so there is nothing to switch off and nobody
-    # to tell. Without this the operator would get an EndpointDisabled event for
-    # an endpoint they deactivated themselves.
+    # is_active is False already, so there is nothing to switch off and nobody to tell.
     endpoint = _endpoint(is_active=False)
     assert note_dead_delivery(endpoint.pk) is False
     endpoint.refresh_from_db()
@@ -105,8 +96,7 @@ def test_an_endpoint_the_customer_switched_off_is_not_disabled_again() -> None:
 
 @override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 1})
 def test_a_deleted_endpoint_is_not_an_error() -> None:
-    # Deleted between the delivery and this hook. The customer removed the
-    # destination; there is nothing to count and nothing owed.
+    # Deleted between the delivery and this hook.
     endpoint = _endpoint()
     endpoint_id = endpoint.pk
     endpoint.delete()
@@ -128,12 +118,6 @@ def test_disabling_says_so_in_the_log_with_both_numbers(
 
 @override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": None})
 def test_the_increment_happens_in_the_database() -> None:
-    # Several deliveries to one endpoint die in parallel workers as a matter of
-    # course, and that is exactly when it matters: a read, an add and a save
-    # lose the increments that arrive together, which are the ones that would
-    # have crossed the threshold. The claim is about concurrency and this suite
-    # is single-process on SQLite, so what is asserted is the thing that makes
-    # the claim true -- the database does the addition, not this process.
     endpoint = _endpoint(consecutive_dead_deliveries=4)
     with CaptureQueriesContext(connection) as queries:
         note_dead_delivery(endpoint.pk)
@@ -156,8 +140,7 @@ def _failing_events() -> list[dict[str, object]]:
 
 @override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 3})
 def test_the_first_dead_delivery_warns_once_and_counts_once() -> None:
-    """Once per incident, never once per delivery - and the edge that fired the
-    warning is also the delivery that was counted, exactly once."""
+    """Once per incident, never once per delivery: the warning edge is the counted one."""
     endpoint = _endpoint()
     assert [note_dead_delivery(endpoint.pk) for _ in range(2)] == [False, False]
 
@@ -221,12 +204,7 @@ def test_a_threshold_of_one_warns_and_disables_on_the_same_delivery() -> None:
 
 @override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": None})
 def test_the_edge_is_decided_by_the_database() -> None:
-    """Exactly once only because the condition travels in the statement.
-
-    The claim is about parallel workers and this suite is single-process, so
-    what is asserted is what makes it true: the zero-to-one change is an update
-    conditioned on the count being zero, not a decision made here after a read.
-    """
+    """Exactly once only because the condition travels in the statement."""
     endpoint = _endpoint()
     with CaptureQueriesContext(connection) as queries:
         note_dead_delivery(endpoint.pk)

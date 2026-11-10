@@ -1,5 +1,3 @@
-"""The migrations load, which is less obvious than it sounds."""
-
 from __future__ import annotations
 
 import importlib
@@ -11,25 +9,13 @@ pytestmark = pytest.mark.django_db
 
 
 def test_the_apps_migrations_load() -> None:
-    # This is a real regression test, not a formality. Django writes a field's
-    # validators into the migration as a dotted path, and this package names
-    # every module after the single symbol it exports. Re-export such a symbol
-    # from the package __init__ and the package attribute *shadows the
-    # submodule*: the migration's
-    # `django_outbound_webhooks.endpoints.validate_webhook_url.validate_webhook_url`
-    # becomes an attribute lookup on a function and raises AttributeError, at
-    # which point no migration in the app can run.
-    #
-    # It was found by an unrelated test needing a database, which is a poor
-    # place to learn it.
+    # This is a real regression test, not a formality.
     loader = MigrationLoader(connection=None, ignore_no_migrations=True)
     ours = [key for key in loader.disk_migrations if key[0] == "django_outbound_webhooks"]
     assert ours, "the app should ship migrations"
 
 
 def test_the_validator_paths_the_migration_uses_still_resolve() -> None:
-    # Naming the exact hazard: each of these has to be importable as
-    # module-then-attribute, which is how the migration spells it.
     for module_path, symbol in [
         ("django_outbound_webhooks.endpoints.validate_webhook_url", "validate_webhook_url"),
         ("django_outbound_webhooks.signing.validate_signing_secret", "validate_signing_secret"),
@@ -42,10 +28,6 @@ def test_the_validator_paths_the_migration_uses_still_resolve() -> None:
 
 
 def test_no_migration_is_missing() -> None:
-    # The endpoint model gained four columns for rotation and endpoint health, which is the moment
-    # this stops being theoretical: a field added without a migration passes every test in the
-    # suite, because the test database is built from the models rather than by migrating. It fails
-    # on somebody's deployment instead, as a column that does not exist.
     from django.core.management import call_command
 
     call_command("makemigrations", "django_outbound_webhooks", "--check", "--dry-run", verbosity=0)

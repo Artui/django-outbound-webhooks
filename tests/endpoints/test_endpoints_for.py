@@ -1,5 +1,3 @@
-"""Which endpoints an event is owed to, and every way that could widen."""
-
 from __future__ import annotations
 
 import base64
@@ -45,9 +43,7 @@ def test_an_inactive_endpoint_does_not() -> None:
 
 
 def test_each_endpoint_appears_once() -> None:
-    # The join could duplicate an endpoint if it held two matching
-    # subscriptions. The unique constraint is what prevents it, and this is
-    # what would notice if the constraint were dropped.
+    # The join could duplicate an endpoint if it held two matching subscriptions.
     endpoint = _subscribed()
     Subscription.objects.create(endpoint=endpoint, event_name="shop.OrderShipped")
     assert list(endpoints_for(event_name="shop.OrderPlaced", scope={})) == [endpoint]
@@ -67,9 +63,6 @@ class TestWithTenancy:
 
     @pytest.fixture(autouse=True)
     def _tenanted(self, settings: object) -> None:
-        # pytest-django's settings fixture rather than override_settings as a
-        # class decorator: that form only works on a Django TestCase subclass
-        # and raises at collection here.
         settings.DJANGO_OUTBOUND_WEBHOOKS = {"TENANT_SCOPE_KEY": "tenant"}
 
     def test_only_the_matching_tenant_matches(self) -> None:
@@ -92,36 +85,16 @@ class TestWithTenancy:
     def test_an_event_with_no_usable_tenant_matches_nothing(
         self, label: str, scope: dict[str, object]
     ) -> None:
-        # The case worth being deliberate about. An event fired outside a
-        # request, by a management command, or by anything that forgot to open
-        # an attributed() block arrives with an empty scope. Reading that as
-        # "no filter" would send one customer's payload to every customer, and
-        # it would look like a successful delivery from every angle.
-        #
-        # Two tenants exist here on purpose: with one, a fail-open would return
-        # the same single row as a correct match and the test would pass either
-        # way.
+        # The case worth being deliberate about.
         _subscribed(tenant="acme")
         _subscribed(tenant="globex")
         assert list(endpoints_for(event_name="shop.OrderPlaced", scope=scope)) == []
 
     def test_a_blank_tenant_column_is_not_a_wildcard(self) -> None:
-        # tenant is a blankable column, so an event carrying an empty string
-        # must not match every endpoint that never set one. Belt and braces:
-        # the model refuses to save such an endpoint under tenancy, so this
-        # builds one the way a migration from an untenanted deployment would.
         Endpoint.objects.filter(pk=_subscribed(tenant="acme").pk).update(tenant="")
         assert list(endpoints_for(event_name="shop.OrderPlaced", scope={"tenant": ""})) == []
 
     def test_an_integer_tenant_in_the_scope_matches_a_text_column(self) -> None:
-        # A characterisation test, not a guard: it pins behaviour this package
-        # depends on and does not implement. An event's scope is JSON and
-        # usually carries an integer primary key while the column is text, and
-        # CharField.get_prep_value is what coerces. Writing our own str() beside
-        # it was tried and removed -- mutating it out changed nothing, so it was
-        # a line that could only ever be trusted for a reason it did not have.
-        # This test goes red if Django ever stops coercing, which is the only
-        # way that dependency could break.
         endpoint = _subscribed(tenant="42")
         assert list(endpoints_for(event_name="shop.OrderPlaced", scope={"tenant": 42})) == [
             endpoint

@@ -1,5 +1,3 @@
-"""Turning a hostname into a checked address."""
-
 from __future__ import annotations
 
 import socket
@@ -26,17 +24,12 @@ def test_it_returns_the_first_address(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_one_bad_address_among_good_ones_refuses_the_lot(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Whichever address a later resolution picks is the one the connection uses,
-    # so a hostname that can answer with a private address is unusable even when
-    # it usually answers with a public one.
     _resolving(monkeypatch, ["93.184.216.34", "127.0.0.1"])
     with pytest.raises(UnsafeDestination, match="loopback"):
         resolve_destination("example.test", 443)
 
 
 def test_the_order_does_not_decide_the_verdict(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The bad one first would be caught by any implementation; the bad one last
-    # is what distinguishes checking all of them from checking the one used.
     _resolving(monkeypatch, ["10.0.0.1", "93.184.216.34"])
     with pytest.raises(UnsafeDestination):
         resolve_destination("example.test", 443)

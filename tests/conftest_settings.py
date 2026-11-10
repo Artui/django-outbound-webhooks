@@ -1,11 +1,3 @@
-"""Settings for the test suite.
-
-SQLite in memory throughout: this package owns an endpoint registry, a body
-format and an HTTP client, and every one of those is backend-neutral. The
-durability machinery that genuinely needs a real server lives in
-``django_domain_events`` and is tested there against Postgres.
-"""
-
 from __future__ import annotations
 
 SECRET_KEY = "not-a-secret-this-is-the-test-suite"

@@ -1,5 +1,3 @@
-"""Domain events a consumer of this package would declare."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

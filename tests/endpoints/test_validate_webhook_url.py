@@ -1,5 +1,3 @@
-"""Refusing a destination that is not an HTTP URL."""
-
 from __future__ import annotations
 
 import pytest

@@ -1,5 +1,3 @@
-"""Reading an endpoint's Retry-After header."""
-
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -33,8 +31,7 @@ def test_a_date_in_the_obsolete_unknown_zone_is_read_as_utc() -> None:
 
 
 def test_a_date_already_past_means_now_rather_than_a_negative_delay() -> None:
-    """The substrate refuses a negative delay, so this is the difference between
-    retrying straight away and failing the delivery for a clock difference."""
+    """The substrate refuses a negative delay: a clock skew would fail the delivery."""
     past = (NOW - timedelta(minutes=5)).strftime("%a, %d %b %Y %H:%M:%S GMT")
     assert retry_after_seconds(past, now=NOW) == 0.0
 
@@ -49,8 +46,7 @@ def test_a_header_that_cannot_be_read_is_no_instruction(header: str) -> None:
 
 
 def test_a_non_ascii_digit_is_not_a_number() -> None:
-    """``str.isdigit`` says yes to a superscript two, and ``int`` then raises -
-    inside a delivery, over a header."""
+    """``str.isdigit`` accepts a superscript two, and ``int`` then raises mid-delivery."""
     assert "²".isdigit()
     assert retry_after_seconds("²", now=NOW) is None
 

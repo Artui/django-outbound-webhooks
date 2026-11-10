@@ -1,5 +1,3 @@
-"""Sending a delivery, and the lease it must not outlive."""
-
 from __future__ import annotations
 
 import base64
@@ -19,9 +17,7 @@ BODY = RenderedBody(body=b'{"hello":"world"}', content_type="application/json")
 
 
 def _client(handler: object) -> httpx2.Client:
-    # httpx2's own MockTransport, not a mocking library. respx targets httpx and
-    # would install a second HTTP client, so every assertion about the wire
-    # would be made against the one this package does not use.
+    # httpx2's own MockTransport, not a mocking library.
     return httpx2.Client(transport=httpx2.MockTransport(handler))
 
 
@@ -52,9 +48,6 @@ def test_a_2xx_succeeds_on_the_first_attempt() -> None:
 
 
 def test_what_goes_on_the_wire_verifies_against_the_specification() -> None:
-    # The only assertion that means anything about conformance: hand the bytes
-    # and headers the endpoint actually received to the specification's own
-    # verifier, which is what a customer runs.
     seen: list[httpx2.Request] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -106,9 +99,6 @@ def test_a_transport_error_is_retried_rather_than_raised() -> None:
 
 
 def test_every_attempt_sends_byte_identical_content_under_one_id() -> None:
-    # webhook-id is stable across attempts and is what a receiver deduplicates
-    # on, so two different bodies under one id leave the customer in a state
-    # that depends on which attempt landed.
     seen: list[httpx2.Request] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -121,9 +111,7 @@ def test_every_attempt_sends_byte_identical_content_under_one_id() -> None:
 
 
 def test_the_timestamp_is_fresh_on_each_attempt() -> None:
-    # The one thing that legitimately differs. Receivers verify the timestamp
-    # against a tolerance window, so a retry that reused the original would be
-    # rejected as too old.
+    # The one thing that legitimately differs.
     seen: list[httpx2.Request] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -137,13 +125,6 @@ def test_the_timestamp_is_fresh_on_each_attempt() -> None:
 
 
 def test_it_stops_before_the_lease_rather_than_after_it() -> None:
-    # The failure this whole tier exists to prevent: an attempt that begins
-    # inside the lease and finishes outside it, so the POST is sent and the
-    # write that records it is rolled back by another worker.
-    #
-    # A short lease with the configured 10s timeout and 2s margin leaves an
-    # 8s deadline; each attempt here is fast, so what stops it is elapsed time
-    # rather than the endpoint.
     attempts = 0
 
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -169,19 +150,7 @@ def test_a_lease_too_short_to_hold_one_request_is_refused() -> None:
 
 
 def test_a_slow_attempt_cannot_push_the_run_past_the_lease(settings: object) -> None:
-    """The property the whole inner tier exists for, driven rather than inspected.
-
-    The instant-response test above does not distinguish stop_before_delay from
-    stop_after_delay, because the overrun only appears when an attempt is slow
-    enough to matter. Verified by mutation: swapping them leaves that test green
-    and only the type assertion in test_retry_policy notices, which is a guard
-    on the spelling rather than on the behaviour.
-
-    Scaled down so it runs in seconds: a 1s timeout, a 0.5s margin and a 4s
-    lease leave a 2.5s deadline, with each attempt taking 0.9s. Under
-    stop_after_delay the last sleep lands at 3.3s and the attempt after it
-    finishes past the lease; under stop_before_delay that sleep is refused.
-    """
+    """The property the whole inner tier exists for, driven rather than inspected."""
     settings.DJANGO_OUTBOUND_WEBHOOKS = {
         "TIMEOUT_SECONDS": 1.0,
         "LEASE_MARGIN_SECONDS": 0.5,
@@ -216,9 +185,7 @@ def _answering(status: int, headers: dict[str, str]) -> tuple[list[httpx2.Reques
 
 @pytest.mark.parametrize("status", [429, 503])
 def test_a_retry_after_ends_the_inner_tier_and_carries_the_time(status: int) -> None:
-    """The endpoint named a time, and it can be minutes past the lease, so the
-    wait belongs to the outer tier. Another request inside the lease would be
-    arriving early at a rate limiter."""
+    """The endpoint named a time past the lease, so the wait belongs to the outer tier."""
     seen, handler = _answering(status, {"Retry-After": "120"})
     history: list[AttemptOutcome] = []
 
@@ -243,8 +210,7 @@ def test_without_the_header_a_429_is_retried_inside_the_lease_as_before(settings
 
 
 def test_a_retry_after_on_any_other_status_is_not_an_instruction(settings: object) -> None:
-    """Sized so the status gate is what answers: the header is present and
-    readable, and a 500 is retryable, so only the gate can leave it unread."""
+    """Sized so the status gate decides: a 500 is retryable, so the header goes unread."""
     settings.DJANGO_OUTBOUND_WEBHOOKS = {
         "TIMEOUT_SECONDS": 0.5,
         "LEASE_MARGIN_SECONDS": 0.2,

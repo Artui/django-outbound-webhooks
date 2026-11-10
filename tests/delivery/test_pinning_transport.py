@@ -1,5 +1,3 @@
-"""Connecting to the address that was checked, and no other."""
-
 from __future__ import annotations
 
 import httpx2
@@ -44,9 +42,6 @@ def test_the_connection_goes_to_the_address_not_the_name(
 def test_tls_still_validates_against_the_customers_hostname(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The connection layer takes server_hostname from this extension, so the
-    # handshake and the certificate check use the real name even though the
-    # socket goes to the pinned address. Without it, pinning would break TLS.
     inner = _send("https://example.test/hooks", monkeypatch, ["93.184.216.34"])
     assert inner.seen[0].extensions["sni_hostname"] == "example.test"
 
@@ -54,9 +49,7 @@ def test_tls_still_validates_against_the_customers_hostname(
 def test_the_host_header_still_names_the_hostname(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # httpx builds it at construction, before this runs, so nothing has to be
-    # done to it. Asserted anyway: a virtual host served by the address would
-    # answer the wrong site if this ever changed.
+    # httpx builds it at construction, before this runs, so nothing has to be done to it.
     inner = _send("https://example.test/hooks", monkeypatch, ["93.184.216.34"])
     assert inner.seen[0].headers["host"] == "example.test"
 
@@ -64,9 +57,7 @@ def test_the_host_header_still_names_the_hostname(
 def test_every_resolved_address_is_checked_not_only_the_one_used(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The attack, rather than a misconfiguration to route around. A hostname
-    # answering with one public address and one private one would pass a check
-    # that looked only at the first, while a later resolution picked the other.
+    # The attack, rather than a misconfiguration to route around.
     with pytest.raises(UnsafeDestination, match="private"):
         _send("https://example.test/hooks", monkeypatch, ["93.184.216.34", "10.0.0.1"])
 
@@ -103,9 +94,6 @@ def test_a_literal_private_address_is_still_refused() -> None:
 def test_a_resolution_failure_is_retryable_rather_than_unsafe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Opposite verdicts, and the distinction is the point of separating them:
-    # DNS briefly unavailable deserves a retry, an address inside the network
-    # deserves none.
     import socket
 
     def fail(*args: object, **kwargs: object) -> None:

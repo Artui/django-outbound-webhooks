@@ -1,22 +1,3 @@
-"""The package root serves some of its names lazily, and its stub declares them.
-
-The root cannot import the model layer at import time, because Django imports
-the package while it is still loading apps. Names that reach the models are
-therefore resolved through a module-level __getattr__ and declared in
-__init__.pyi, so a type checker sees their real types. These tests hold the
-three descriptions of the root together: the runtime __all__, the lazy table,
-and the stub.
-
-What guards the eager/lazy split. The static partition test reads the root's
-own source and fails if a lazy name is also bound by a plain import. A second
-regression, an eager import of a lazy name, also stops pytest before any test
-runs: pytest-django calls django.setup() during startup, and that imports the
-package. So the startup failure is the loud gate, and the partition test is
-the one a reader can run in isolation. The subprocess tests below check what a
-fresh interpreter loads, for the cases where the runner is not the first to
-import the package.
-"""
-
 from __future__ import annotations
 
 import ast
@@ -99,12 +80,7 @@ def test_every_public_name_is_either_eager_or_lazy_and_never_both() -> None:
 
 
 def test_importing_the_package_in_a_fresh_interpreter_loads_no_models() -> None:
-    """Django imports the package before apps are ready, so the import must stay light.
-
-    After a plain import, none of the lazy leaf modules may be loaded, nor any
-    module under the package's models, nor django.db.models, which the eager
-    root used to pull in through endpoints_for.
-    """
+    """Django imports the package before apps are ready, so the import must stay light."""
     leaves = sorted(set(LAZY.values()))
     result = _run_python(
         "import sys\n"
@@ -152,11 +128,7 @@ def test_unknown_attribute_raises_attribute_error() -> None:
 
 
 def test_dir_lists_lazy_names_that_were_never_accessed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Remove every lazy name from the namespace first, so only __dir__ can list them.
-
-    Earlier tests cache the lazy names into the module dict, so without this a
-    dir() that ignored them would still look complete.
-    """
+    """Remove every lazy name from the namespace first, so only __dir__ can list them."""
     for name in LAZY:
         monkeypatch.delitem(vars(django_outbound_webhooks), name, raising=False)
     assert set(dir(django_outbound_webhooks)) >= PUBLIC

@@ -1,10 +1,3 @@
-"""One fired event becoming one delivery row per subscribed endpoint.
-
-What is asserted is the rows the substrate wrote - how many, and the target each
-carries - rather than that a POST happened, because a round trip through the
-receiver would pass for a design that delivered once to everybody.
-"""
-
 from __future__ import annotations
 
 import base64
@@ -76,8 +69,7 @@ def test_a_subscribed_endpoint_gets_one_delivery_row() -> None:
 
 
 def test_each_subscribed_endpoint_gets_its_own_row() -> None:
-    """The whole point: each row has its own attempt count, backoff and
-    dead-letter, so one rotted endpoint cannot drag the others."""
+    """Each row has its own attempts and dead-letter; one rotted endpoint drags no other."""
     first = _endpoint("Acme")
     second = _endpoint("Globex", url="https://other.test/hooks")
     event_id = _fire(OrderPlaced(order_id=1, total_cents=100))
@@ -93,21 +85,14 @@ def test_an_endpoint_subscribed_to_something_else_gets_nothing() -> None:
 
 
 def test_an_event_nobody_subscribes_to_writes_no_row_at_all() -> None:
-    """A wildcard receiver is owed every event; returning no targets is what
-    keeps the delivery table from growing a row per event in the system."""
+    """A wildcard receiver is owed every event; returning none must not grow the table."""
     _endpoint()
     event_id = _fire(OrderShipped(order_id=1))
     assert DeliveryRecord.objects.filter(event_id=event_id).count() == 0
 
 
 def test_the_event_reaches_only_its_own_tenants_endpoints(settings: object) -> None:
-    """The isolation boundary, through fire() rather than beside it.
-
-    ``endpoints_for`` is tested on its own; what only this can show is that the
-    scope the event was fired under is the scope the boundary is handed. Two
-    tenants subscribed to the same event, so a callable that dropped the scope
-    would either send to both or - failing closed - to neither.
-    """
+    """The isolation boundary, through fire() rather than beside it."""
     settings.DJANGO_OUTBOUND_WEBHOOKS = {
         **settings.DJANGO_OUTBOUND_WEBHOOKS,
         "TENANT_SCOPE_KEY": "tenant",
@@ -124,8 +109,6 @@ def test_the_event_reaches_only_its_own_tenants_endpoints(settings: object) -> N
 
 
 def test_the_message_id_is_unique_per_delivery() -> None:
-    # A receiver deduplicates on webhook-id, so two customers sharing one would
-    # mean the second silently dropping a delivery it should have taken.
     _endpoint("Acme")
     _endpoint("Globex", url="https://other.test/hooks")
     event_id = _fire(OrderPlaced(order_id=1, total_cents=100))
@@ -135,9 +118,6 @@ def test_the_message_id_is_unique_per_delivery() -> None:
 
 
 def test_the_format_is_frozen_when_the_event_is_fired() -> None:
-    # An operator editing an endpoint's pin between the first attempt and a
-    # retry must not change what an already-integrated consumer receives, under
-    # a signature that still verifies.
     endpoint = _endpoint()
     event_id = _fire(OrderPlaced(order_id=1, total_cents=100))
     Endpoint.objects.filter(pk=endpoint.pk).update(format_name="cloudevents", format_version=9)
@@ -147,8 +127,7 @@ def test_the_format_is_frozen_when_the_event_is_fired() -> None:
 
 
 def test_the_frozen_format_is_the_endpoints_own(second_format: FormatId) -> None:
-    """The one above cannot tell a read from a hardcoded default, since every
-    other endpoint in the suite is pinned to the same format."""
+    """The test above cannot tell a read from a default; the others are pinned."""
     _endpoint("Acme", format_name=second_format.name, format_version=second_format.version)
     event_id = _fire(OrderPlaced(order_id=1, total_cents=100))
 
@@ -169,14 +148,7 @@ def test_the_frozen_format_is_the_endpoints_own(second_format: FormatId) -> None
     ids=lambda event: type(event).__name__,
 )
 def test_this_packages_own_events_are_never_delivered_even_to_a_subscriber(event: object) -> None:
-    """Sized so the exclusion is what answers, once for each member.
-
-    The endpoint really is subscribed to the internal event, and the tenant
-    boundary really would match it - the precondition says so - so an empty
-    result can only come from the exclusion and not from nobody subscribing.
-    One case per class, because a class-tuple ``isinstance`` is a single branch
-    to coverage whichever member it matches.
-    """
+    """Sized so the exclusion is what answers, once for each member."""
     name = registry.event_for_class(type(event)).name
     endpoint = _endpoint(event_names=[name])
     assert list(endpoints_for(event_name=name, scope={})) == [endpoint]
@@ -196,11 +168,7 @@ def test_the_internal_events_are_exactly_this_packages_own() -> None:
 
 
 def test_the_lookup_is_one_query_per_fired_event() -> None:
-    """The cost the targets callable adds to every write in the deployment.
-
-    It runs inside the caller's transaction on every fired event, so the claim
-    that it is one lookup is a claim about somebody else's hot path.
-    """
+    """The cost the targets callable adds to every write in the deployment."""
     _endpoint("Acme")
     _endpoint("Globex", url="https://other.test/hooks")
     context = DeliveryContext(
@@ -233,8 +201,7 @@ def test_an_internal_event_costs_no_query_at_all() -> None:
 
 
 def test_a_replay_target_left_behind_does_not_redirect_another_event() -> None:
-    """Tied to one event id, so a value that outlived its replay cannot send
-    every later event to one customer's endpoint."""
+    """Tied to one event id, so a stale value cannot send later events to one endpoint."""
     acme = _endpoint("Acme")
     globex = _endpoint("Globex", url="https://other.test/hooks")
     stray = DeliveryTarget(
@@ -277,12 +244,7 @@ def _late_app_cleanup() -> Iterator[None]:
 def test_an_event_declared_by_an_app_that_loads_later_reaches_its_endpoints(
     _late_app_cleanup: None, no_real_network: list[object]
 ) -> None:
-    """What a registry walk at startup could never do, through real app loading.
-
-    The receiver was declared in this package's ready(). Only then is
-    ``tests.lateapp`` installed, so its event is declared by the substrate's
-    autodiscovery afterwards - which the precondition pins.
-    """
+    """What a registry walk at startup could never do, through real app loading."""
     assert registry.event_for_name("lateapp.LateArrival") is None
     endpoint = _endpoint(event_names=["lateapp.LateArrival"])
 
