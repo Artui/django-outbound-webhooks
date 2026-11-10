@@ -1,5 +1,3 @@
-"""The endpoint row itself, which is all this model is."""
-
 from __future__ import annotations
 
 import base64
@@ -38,31 +36,18 @@ def test_str_names_the_url_and_the_pinned_format() -> None:
 
 
 def test_the_field_validators_fire_wherever_full_clean_runs() -> None:
-    # Declared on the fields rather than written into a clean() method, so a
-    # form, the admin, a serializer and register_endpoint all get them without
-    # the model growing behaviour.
     with pytest.raises(ValidationError) as raised:
         _endpoint(secret="ab cd", url="file:///etc/passwd").full_clean()
     assert set(raised.value.error_dict) == {"secret", "url"}
 
 
 def test_a_bare_save_does_not_validate() -> None:
-    # Stated rather than implied. Django's convention is that model validation
-    # belongs to forms, and this model follows it: the door with the rules
-    # behind it is register_endpoint, and a caller reaching past it gets
-    # Django's ordinary behaviour rather than a surprise.
+    # Stated rather than implied.
     _endpoint(url="file:///etc/passwd").save()
     assert Endpoint.objects.count() == 1
 
 
 def test_an_endpoint_that_predates_rotation_and_health_reads_correctly() -> None:
-    # A nullable AddField backfills nothing and a defaulted one backfills its
-    # default, so what an existing row reads after the 0.3.0 migration is
-    # exactly what a row created without these kwargs reads now. Asserting the
-    # second is the closest this suite gets to the first without a migration
-    # harness, and it is the assertion that matters: every one of these has to
-    # say "nothing has happened yet" rather than something that looks like a
-    # rotation or a disabling that never took place.
     endpoint = Endpoint(
         name="Acme production",
         url="https://example.test/hooks",

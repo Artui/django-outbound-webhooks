@@ -1,5 +1,3 @@
-"""One event type an endpoint has asked for."""
-
 from __future__ import annotations
 
 import base64
@@ -33,8 +31,6 @@ def test_an_endpoint_can_subscribe_to_several_events(endpoint: Endpoint) -> None
 
 
 def test_subscribing_twice_to_one_event_is_refused(endpoint: Endpoint) -> None:
-    # Without the constraint an endpoint with a duplicated subscription would
-    # be joined twice by the matching query and receive the event twice.
     Subscription.objects.create(endpoint=endpoint, event_name="shop.OrderPlaced")
     with pytest.raises(IntegrityError):
         Subscription.objects.create(endpoint=endpoint, event_name="shop.OrderPlaced")
@@ -54,10 +50,6 @@ def test_str_names_the_event_and_the_endpoint(endpoint: Endpoint) -> None:
 def test_str_traverses_the_endpoint_rather_than_reading_its_key(
     endpoint: Endpoint, django_assert_num_queries: object
 ) -> None:
-    # The cost of naming the endpoint instead of its id, stated rather than
-    # discovered: one query per instance that did not fetch the relation. Any
-    # listing rendering this needs select_related("endpoint"), which is the
-    # obligation the 0.4.0 admin inherits.
     subscription = Subscription.objects.create(endpoint=endpoint, event_name="shop.OrderPlaced")
     fresh = Subscription.objects.get(pk=subscription.pk)
     with django_assert_num_queries(1):
