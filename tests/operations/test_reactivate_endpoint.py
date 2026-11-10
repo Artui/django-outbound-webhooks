@@ -1,5 +1,3 @@
-"""Putting an auto-disabled endpoint back into service."""
-
 from __future__ import annotations
 
 import base64
@@ -40,10 +38,7 @@ def test_it_switches_the_endpoint_back_on() -> None:
 
 @override_settings(DJANGO_OUTBOUND_WEBHOOKS={"AUTO_DISABLE_AFTER_DEAD_DELIVERIES": 2})
 def test_the_next_failure_does_not_disable_it_immediately() -> None:
-    # The reason this function exists rather than leaving callers to set
-    # is_active. An endpoint re-enabled with its count still at the threshold is
-    # switched off again by its very next dead delivery, which looks exactly
-    # like the re-enabling having silently failed.
+    # The reason this function exists rather than leaving callers to set is_active.
     endpoint = _endpoint()
     note_dead_delivery(endpoint.pk)
     note_dead_delivery(endpoint.pk)
@@ -57,8 +52,6 @@ def test_the_next_failure_does_not_disable_it_immediately() -> None:
 
 
 def test_reactivating_an_active_endpoint_still_clears_its_count() -> None:
-    # Reasonable to want after a customer has fixed their receiver, and there is
-    # nothing to refuse: the count is the thing being reset either way.
     endpoint = _endpoint(consecutive_dead_deliveries=5)
     reactivate_endpoint(endpoint)
     endpoint.refresh_from_db()
@@ -66,8 +59,6 @@ def test_reactivating_an_active_endpoint_still_clears_its_count() -> None:
 
 
 def test_it_survives_a_reload() -> None:
-    # Writes named fields, so one left out of update_fields would pass every
-    # assertion made against the in-memory instance and persist nothing.
     endpoint = _endpoint(is_active=False, disabled_at=timezone.now(), consecutive_dead_deliveries=9)
     reactivate_endpoint(endpoint)
     reloaded = Endpoint.objects.get(pk=endpoint.pk)
@@ -79,8 +70,7 @@ def test_it_survives_a_reload() -> None:
 
 
 def test_switching_it_back_on_is_not_a_recovery() -> None:
-    """Somebody deciding an endpoint deserves another chance is not evidence it
-    answers, so no EndpointRecovered; the first delivery that lands is."""
+    """A reactivation is not evidence it answers; the first delivery that lands is."""
     endpoint = _endpoint(
         is_active=False, disabled_at=timezone.now(), consecutive_dead_deliveries=20
     )

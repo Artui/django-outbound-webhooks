@@ -1,5 +1,3 @@
-"""The event fired when a failing endpoint delivers again."""
-
 from __future__ import annotations
 
 from django_domain_events import registry

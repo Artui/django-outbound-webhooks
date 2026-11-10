@@ -1,5 +1,3 @@
-"""Forgetting an endpoint's failures once it answers again."""
-
 from __future__ import annotations
 
 import base64
@@ -38,9 +36,7 @@ def _recovered_events() -> list[dict[str, object]]:
 
 
 def test_a_success_clears_what_came_before_it() -> None:
-    # "Sustained" is the whole content of auto-disable. Without this, the
-    # threshold counts lifetime failures and every endpoint reaches it in the
-    # end, including one that has never had a bad week.
+    # "Sustained" is the whole content of auto-disable.
     endpoint = _endpoint(consecutive_dead_deliveries=7)
     note_successful_delivery(endpoint)
     endpoint.refresh_from_db()
@@ -48,10 +44,6 @@ def test_a_success_clears_what_came_before_it() -> None:
 
 
 def test_it_does_not_re_enable_an_endpoint() -> None:
-    # A disabled endpoint delivers nothing, so this cannot be reached through
-    # the delivery path -- but a replay or a hand-fired delivery could, and
-    # "the endpoint answered once" is not the same decision as "put it back into
-    # service", which is reactivate_endpoint and is somebody's choice.
     endpoint = _endpoint(consecutive_dead_deliveries=20, is_active=False)
     note_successful_delivery(endpoint)
     endpoint.refresh_from_db()
@@ -59,22 +51,12 @@ def test_it_does_not_re_enable_an_endpoint() -> None:
 
 
 def test_the_ordinary_case_is_one_statement_that_touches_no_row() -> None:
-    # Every successful delivery runs this, and almost every endpoint is already
-    # at zero. The filter is what keeps that from rewriting a row per delivery.
-    #
-    # It is *not* free, and this test is what established that: Django sends the
-    # UPDATE with the condition in its WHERE clause rather than deciding here,
-    # so the statement is issued and matches nothing. The claim that it cost no
-    # write at all was in this module's docstring until this assertion was
-    # written, which is the usual way round.
+    # Every successful delivery runs this, and almost every endpoint is already at zero.
     endpoint = _endpoint()
     with CaptureQueriesContext(connection) as queries:
         note_successful_delivery(endpoint)
 
     assert len(queries.captured_queries) == 1
-    # The condition travels in the statement, which is what keeps the row
-    # untouched. Asserting the column is zero afterwards would pass just as
-    # happily for an unconditional write, since it was already zero.
     assert '"consecutive_dead_deliveries" > 0' in queries.captured_queries[0]["sql"]
     assert Endpoint.objects.filter(pk=endpoint.pk, consecutive_dead_deliveries=0).exists()
 
@@ -87,8 +69,7 @@ def test_a_missing_endpoint_is_not_an_error() -> None:
 
 
 def test_the_success_that_ends_an_incident_says_so_once() -> None:
-    """The reset, and only the reset: the second success finds nothing to
-    clear and is not an event."""
+    """The reset, and only the reset: a second success clears nothing and is no event."""
     endpoint = _endpoint(consecutive_dead_deliveries=4)
     with transaction.atomic():
         note_successful_delivery(endpoint)
@@ -104,8 +85,7 @@ def test_an_endpoint_that_was_not_failing_is_not_recovered() -> None:
 
 
 def test_recovering_costs_no_read() -> None:
-    """The event rides on the update's answer, and the name comes from the
-    endpoint the delivery already loaded to send the request."""
+    """The event rides on the update's answer; the name is the endpoint already loaded."""
     endpoint = _endpoint(consecutive_dead_deliveries=4)
     with CaptureQueriesContext(connection) as queries, transaction.atomic():
         note_successful_delivery(endpoint)

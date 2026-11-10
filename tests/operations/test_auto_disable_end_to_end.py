@@ -1,12 +1,3 @@
-"""Auto-disable driven by real deliveries rather than by calling the counter.
-
-Mirrors the feature rather than one module, like the delivery-log tests: the
-wiring is what is under test here, and it is spread across the receiver's
-success path, the substrate's failure hook and the two counters. Each of those
-is unit-tested beside its own source; what only this file can show is that a
-delivery failing for real reaches them.
-"""
-
 from __future__ import annotations
 
 import base64
@@ -70,8 +61,6 @@ def _endpoint() -> Endpoint:
 def _fire_and_drain(times: int = 12) -> None:
     with transaction.atomic():
         fire(OrderPlaced(order_id=7, total_cents=2500))
-    # Drained repeatedly: each pass is one outer attempt, and the passes burn the
-    # delivery's attempt budget until the substrate declares it dead.
     for _ in range(times):
         drain_outbox()
 
@@ -99,9 +88,7 @@ def test_the_second_one_switches_the_endpoint_off(monkeypatch: pytest.MonkeyPatc
 
 
 def test_a_delivery_that_lands_clears_the_count(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The half that makes the threshold mean "sustained". Without it an endpoint
-    # that fails once a month is disabled in the end, and the test that would
-    # have caught that is this one rather than any unit test of the counter.
+    # The half that makes the threshold mean "sustained".
     _answering(monkeypatch, 500)
     endpoint = _endpoint()
     _fire_and_drain()
@@ -121,8 +108,7 @@ def _names(name: str) -> int:
 
 
 def test_an_incident_is_announced_once_and_closed_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Driven by real deliveries: two dying for real warn once, and the delivery
-    that lands afterwards closes it once."""
+    """Driven by real deliveries: two failures warn once, a later success closes it."""
     _answering(monkeypatch, 500)
     endpoint = _endpoint()
     _fire_and_drain()
