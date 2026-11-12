@@ -41,7 +41,9 @@ registered: registration only requires an `http` or `https` URL. A destination
 is refused if it resolves to link-local, multicast, unspecified, reserved or
 carrier-grade NAT space, and no setting changes that. Private and loopback space
 are refused too, unless `ALLOW_PRIVATE_ADDRESSES` is set, which is for
-development.
+development. An IPv6 address that embeds an IPv4 address (6to4, IPv4-mapped) is
+judged by that IPv4 address too, so `2002:a9fe:a9fe::1` is refused as the link-local
+metadata address it carries.
 
 A hostname is resolved once for each request, every address it returns is
 checked, and the connection is made to the address that was checked. A DNS
