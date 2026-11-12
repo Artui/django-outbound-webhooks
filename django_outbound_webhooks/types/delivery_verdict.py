@@ -13,5 +13,5 @@ class DeliveryVerdict(enum.Enum):
     way that is usually temporary."""
 
     PERMANENT = "permanent"
-    """Not worth trying again. The endpoint is gone, or refused the request in a
-    way that repeating cannot fix."""
+    """Not worth another request in this delivery: the endpoint is gone, or refused
+    it in a way repeating cannot fix. The substrate still retries the delivery."""

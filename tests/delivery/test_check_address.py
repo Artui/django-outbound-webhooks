@@ -74,6 +74,8 @@ class TestWithPrivateAddressesAllowed:
             ("224.0.0.1", "multicast"),
             ("100.64.0.1", "carrier-grade NAT"),
             ("0.0.0.0", "unspecified"),
+            ("240.0.0.1", "reserved"),
+            ("64:ff9b::a9fe:a9fe", "reserved"),
         ],
     )
     def test_the_hatch_does_not_open_the_dangerous_ones(self, address: str, why: str) -> None:
