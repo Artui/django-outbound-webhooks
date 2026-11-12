@@ -17,6 +17,40 @@ dead-letter and replay. An event nobody subscribes to writes no row. The lookup
 is one indexed query on every event the project fires, and the receiver is
 matched at fire time, so the order of `INSTALLED_APPS` does not matter.
 
+With `TENANT_SCOPE_KEY` set, an event whose scope has no value under that key
+reaches no endpoint, and no delivery row is written for it, so a missing tenant
+fails closed rather than reaching every subscriber. In that deployment an
+endpoint without a tenant is refused at registration, for the same reason.
+Without the key, every active subscriber to the event is owed it.
+
+Within one delivery, a `408`, `429` or `5xx` answer is retried, and any other
+answer that is not a `2xx` ends that delivery's requests at once. The delivery
+itself is still retried on the substrate's schedule, so a `410` or a `400` uses
+the whole budget of five attempts before it is dead-lettered, and counts toward
+auto-disable like any other dead delivery.
+
+A request the address check refuses is not recorded as an attempt. Its delivery
+is retried on the substrate's schedule and dead-lettered like any other, and the
+reason is on the substrate's delivery record, not in the attempt log.
+
+## Where deliveries go
+
+Every request goes to an address the package has checked, and that check is the
+policy. The check runs when a request is sent, not when the endpoint is
+registered: registration only requires an `http` or `https` URL. A destination
+is refused if it resolves to link-local, multicast, unspecified, reserved or
+carrier-grade NAT space, and no setting changes that. Private and loopback space
+are refused too, unless `ALLOW_PRIVATE_ADDRESSES` is set, which is for
+development.
+
+A hostname is resolved once for each request, every address it returns is
+checked, and the connection is made to the address that was checked. A DNS
+answer that changes between the check and the connection therefore cannot move
+the request. A literal IP in the URL is checked without a lookup. Redirects are
+followed up to `MAX_REDIRECTS`, and each hop is checked the same way. A `307` or
+`308` redirect re-sends the signed body and the `webhook-` headers to its
+target, so a redirect is a second place the payload can go.
+
 ## Body formats
 
 An endpoint is pinned to one published format *version* at registration, and a
@@ -48,6 +82,26 @@ An operator's own format is any object with a `name`, a `version` and a
 render a delivery, because a format is published once at startup and called
 hours later in another process.
 
+`render()` returns UTF-8 bytes, because the signature is computed over the body
+as text. The registry checks the method's keywords when a format is registered,
+but not the encoding: a body that is not UTF-8 is refused when a delivery is
+sent, and that delivery is retried like any other failure.
+
+## Signing
+
+Each request carries `webhook-id`, `webhook-timestamp` and `webhook-signature`,
+as the Standard Webhooks specification defines them, and the signature covers
+the body as text. The secret is the base64 string you registered, with or
+without its `whsec_` prefix. This package signs but does not verify: a customer
+verifies with a Standard Webhooks library, using that secret. During a rotation
+the header carries one signature per secret still in its overlap window, and a
+receiver accepts the request if any of them verifies.
+
+Every retry of a delivery sends the same body under the same `webhook-id`, so a
+receiver can deduplicate on that header. `webhook-timestamp` is taken fresh for
+each attempt, so a receiver should check it against its own tolerance window,
+not against the first attempt.
+
 ## Operations
 
 `replay_delivery(message_id=...)` fires a logged delivery again. It is a **new**
@@ -58,6 +112,10 @@ attempt budget, backoff and log rows, because it goes through the substrate like
 everything else. It refuses rather than firing something that cannot arrive - an
 unlogged message id, a deleted endpoint, an inactive one, or an event retention
 has already pruned.
+
+`replay_delivery` returns once the new delivery is recorded, not once it is
+sent. The send happens later, when the substrate's relay claims the row. Its
+outcome is in the attempt log under the returned `webhook-id`.
 
 `rotate_secret(endpoint, new_secret=...)` changes a secret without a coordinated
 cutover. Both secrets sign for `SECRET_ROTATION_OVERLAP_SECONDS`, and a receiver
@@ -79,6 +137,21 @@ clears the count, which has to happen together: an endpoint re-enabled with its
 count still at the threshold is switched off again by its very next dead
 delivery.
 
+A delivery still queued when its endpoint is switched off or deleted is dropped
+when it next runs. Nothing is sent and no attempt row is written, so it does not
+appear in the log and cannot be replayed by its `webhook-id`.
+
+## Settings
+
+Each delivery has `DELIVERY_LEASE_SECONDS` to finish its requests. The package
+retries a failed request until the delivery has used the lease less
+`TIMEOUT_SECONDS` and `LEASE_MARGIN_SECONDS`, and no further request is started
+after that. Raise the lease or lower the timeout if a lease cannot hold one
+request and the margin: otherwise every delivery raises a `ValueError` when it is
+sent. The other keys are described where their behaviour is: `TENANT_SCOPE_KEY`
+under "How delivery works", `ALLOW_PRIVATE_ADDRESSES` and `MAX_REDIRECTS` under
+"Where deliveries go", and `LOG_BODY_CHARS` under "Admin".
+
 ## Admin
 
 Install `django.contrib.admin` and both models appear. The registry page shows
@@ -87,6 +160,12 @@ row" rather than a bare number - and links each endpoint to its own attempts
 instead of counting them, because the next question is what the last one said.
 The log page is read-only and renders both attempt numbers as `3.2`, so which
 tier each counts stays legible.
+
+Each log row is one attempt at the endpoint's URL. It keeps that URL as it was
+then, query string included, a SHA-256 and the length of the request body, and
+the first `LOG_BODY_CHARS` of the response body or of the transport error. The
+body itself is not kept. Deleting an endpoint keeps its rows and clears only
+their link to it, so a row can name a URL the registry no longer holds.
 
 Two actions: `reactivate` on the registry, which clears the dead-delivery count
 along with the flag, and `replay` on the log, which sends **once per delivery
