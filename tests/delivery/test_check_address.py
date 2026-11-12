@@ -82,3 +82,44 @@ class TestWithPrivateAddressesAllowed:
         # "Let me reach localhost" is never a request to reach the metadata service.
         with pytest.raises(UnsafeDestination, match=why):
             check_address(address)
+
+    @pytest.mark.parametrize(
+        ("address", "why"),
+        [
+            ("2002:a9fe:a9fe::1", "link-local"),
+            ("2002:e000:0001::1", "multicast"),
+            ("2002:6440:0001::1", "carrier-grade NAT"),
+            ("::ffff:169.254.169.254", "link-local"),
+            ("2001:0:a9fe:a9fe::1", "link-local"),
+            ("2001:0:4136:e378:8000:63bf:5601:5601", "link-local"),
+        ],
+    )
+    def test_an_embedded_ipv4_address_is_judged_by_that_address(
+        self, address: str, why: str
+    ) -> None:
+        with pytest.raises(UnsafeDestination, match=rf"{why} \(embedded"):
+            check_address(address)
+
+    def test_an_embedded_private_address_is_as_reachable_as_the_private_one(self) -> None:
+        check_address("2002:0a00:0001::1")
+
+
+@pytest.mark.parametrize(
+    ("address", "embedded"),
+    [
+        ("2002:0a00:0001::1", "10.0.0.1"),
+        ("2002:7f00:0001::1", "127.0.0.1"),
+        ("::ffff:10.0.0.1", "10.0.0.1"),
+        ("2001:0:4136:e378:8000:63bf:f5ff:fffe", "10.0.0.1"),
+    ],
+)
+def test_an_embedded_private_address_is_refused_unless_the_hatch_is_open(
+    address: str, embedded: str
+) -> None:
+    with pytest.raises(UnsafeDestination, match=rf"private \(embedded {embedded}\)"):
+        check_address(address)
+
+
+def test_the_refusal_says_which_address_was_embedded() -> None:
+    with pytest.raises(UnsafeDestination, match=r"link-local \(embedded 169\.254\.169\.254\)"):
+        check_address("2002:a9fe:a9fe::1")

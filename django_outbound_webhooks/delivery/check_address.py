@@ -13,11 +13,10 @@ from django_outbound_webhooks.settings import setting
 CARRIER_GRADE_NAT = ipaddress.ip_network("100.64.0.0/10")
 
 
-def check_address(address: str) -> None:
-    """Raise unless this address is somewhere on the public internet."""
-    parsed = ipaddress.ip_address(address)
-
-    allow_private = setting("ALLOW_PRIVATE_ADDRESSES")
+def _refusals(
+    parsed: ipaddress.IPv4Address | ipaddress.IPv6Address, allow_private: bool
+) -> list[str]:
+    """The names of every rule this one address breaks."""
     never = {
         "link-local": parsed.is_link_local,
         "multicast": parsed.is_multicast,
@@ -33,8 +32,25 @@ def check_address(address: str) -> None:
     matched = dict(never)
     if not allow_private:
         matched.update(local)
+    return sorted(name for name, hit in matched.items() if hit)
 
-    named = sorted(name for name, hit in matched.items() if hit)
+
+def _embedded(parsed: ipaddress.IPv4Address | ipaddress.IPv6Address) -> list[ipaddress.IPv4Address]:
+    """The IPv4 addresses an IPv6 one carries: 6to4, IPv4-mapped, and Teredo's server and client."""
+    if not isinstance(parsed, ipaddress.IPv6Address):
+        return []
+    teredo = parsed.teredo or ()
+    return [ip for ip in (parsed.sixtofour, parsed.ipv4_mapped, *teredo) if ip is not None]
+
+
+def check_address(address: str) -> None:
+    """Raise unless this address, and any IPv4 address inside it, is on the public internet."""
+    parsed = ipaddress.ip_address(address)
+    allow_private = setting("ALLOW_PRIVATE_ADDRESSES")
+
+    named = _refusals(parsed, allow_private)
+    for inner in _embedded(parsed):
+        named += [f"{name} (embedded {inner})" for name in _refusals(inner, allow_private)]
     if named:
         raise UnsafeDestination(
             f"{address} is {', '.join(named)}, which a webhook must not be delivered to. "
