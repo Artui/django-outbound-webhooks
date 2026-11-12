@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **`ALLOW_PRIVATE_ADDRESSES` no longer opens reserved address space.** The setting was documented as relaxing private and loopback addresses only, but `check_address` grouped reserved space with them, so with the flag on a destination such as `240.0.0.1` or `64:ff9b::a9fe:a9fe` (the NAT64 form of the cloud metadata address) was delivered to. Reserved space is now refused whatever the flag says. `::1` stays reachable with the flag on, as loopback, although Python also classes it as reserved. A development setup that delivered to an address in a reserved range will now see it refused.
 - **`DEFAULT_FORMAT` naming nothing is now reported by `manage.py check`.** `check_default_format_is_published` (`django_outbound_webhooks.W002`) was registered by a decorator in `checks.py`, which no code path in a running project imports, so in a deployment the check never ran and a bad default surfaced only when the first endpoint was registered. `WebhooksConfig.ready` now registers it. A project whose `DEFAULT_FORMAT` names a family nothing publishes will see the warning on its next `check` or `migrate`; it is a warning, so nothing stops.
 
 ### Changed

@@ -17,20 +17,21 @@ def check_address(address: str) -> None:
     """Raise unless this address is somewhere on the public internet."""
     parsed = ipaddress.ip_address(address)
 
+    allow_private = setting("ALLOW_PRIVATE_ADDRESSES")
     never = {
         "link-local": parsed.is_link_local,
         "multicast": parsed.is_multicast,
         "unspecified": parsed.is_unspecified,
         "carrier-grade NAT": parsed in CARRIER_GRADE_NAT,
+        "reserved": parsed.is_reserved and not (allow_private and parsed.is_loopback),
     }
     local = {
         "private": parsed.is_private,
         "loopback": parsed.is_loopback,
-        "reserved": parsed.is_reserved,
     }
 
     matched = dict(never)
-    if not setting("ALLOW_PRIVATE_ADDRESSES"):
+    if not allow_private:
         matched.update(local)
 
     named = sorted(name for name, hit in matched.items() if hit)
