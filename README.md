@@ -39,6 +39,12 @@ fails closed rather than reaching every subscriber. In that deployment an
 endpoint without a tenant is refused at registration, for the same reason.
 Without the key, every active subscriber to the event is owed it.
 
+A tenant holds at most 255 characters, the indexed column's width. A longer one
+is refused before the write with `ValueTooLong`, which names the field and its
+limit, on every backend and on every path that saves an endpoint, `.create()`
+and `bulk_create` included. A queryset `.update()` or `bulk_update` skips the
+check and meets the database's own limit, which SQLite does not enforce.
+
 An endpoint answering `429` or `503` with `Retry-After` is taken at its word:
 that delivery stops retrying inside its lease and its next attempt is scheduled
 for the time the endpoint named, which still counts against the delivery's
