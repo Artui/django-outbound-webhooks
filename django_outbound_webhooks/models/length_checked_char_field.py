@@ -9,7 +9,7 @@ from django_outbound_webhooks.models.value_too_long import ValueTooLong
 
 
 class LengthCheckedCharField(models.CharField):
-    """A `CharField` that refuses an over-long value on every save, not only in `full_clean`.
+    """A `CharField` that refuses an over-long value in `pre_save`, not only in `full_clean`.
 
     Migrations see a plain `CharField`, so no `AlterField` (SQLite rebuilds the table)."""
 
