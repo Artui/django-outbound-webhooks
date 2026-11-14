@@ -25,9 +25,13 @@ Without the key, every active subscriber to the event is owed it.
 
 A tenant holds at most 255 characters, the indexed column's width. A longer one
 is refused before the write with `ValueTooLong`, which names the field and its
-limit, on every backend and on every path that saves an endpoint, `.create()`
-and `bulk_create` included. A queryset `.update()` or `bulk_update` skips the
-check and meets the database's own limit, which SQLite does not enforce.
+limit, on every backend, through `save()`, `.create()`, `bulk_create`,
+`get_or_create` and `update_or_create`. Three writes skip the check: a queryset
+`.update()` and a fixture or other raw save meet the database's own limit, which
+SQLite does not enforce, and `bulk_update` on Postgres casts the value to the
+column type, which truncates it to 255 characters without an error. The error is
+raised inside Django's save, so a caller that catches it inside a transaction
+wraps that save in its own `atomic()` to keep the transaction usable.
 
 Within one delivery, a `408`, `429` or `5xx` answer is retried, and any other
 answer that is not a `2xx` ends that delivery's requests at once. The delivery

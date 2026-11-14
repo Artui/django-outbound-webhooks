@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import base64
 import contextlib
+from collections.abc import Callable
 
 import pytest
+from django.core import serializers
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError, transaction
+from django.db import DataError, connection, transaction
 from django.db.models import Value
+from django.db.transaction import TransactionManagementError
 
 from django_outbound_webhooks.models.endpoint import Endpoint
 from django_outbound_webhooks.models.value_too_long import ValueTooLong
@@ -118,11 +121,61 @@ def test_a_tenant_written_as_an_expression_is_left_to_the_database() -> None:
     assert endpoint.tenant == "acme"
 
 
-def test_update_and_bulk_update_skip_the_check_and_meet_the_database() -> None:
+def _update(endpoint: Endpoint) -> None:
+    Endpoint.objects.update(tenant=endpoint.tenant)
+
+
+def _bulk_update(endpoint: Endpoint) -> None:
+    Endpoint.objects.bulk_update([endpoint], ["tenant"])
+
+
+def _raw_save(endpoint: Endpoint) -> None:
+    for loaded in serializers.deserialize("json", serializers.serialize("json", [endpoint])):
+        loaded.save()
+
+
+@pytest.mark.parametrize("write", [_update, _raw_save])
+def test_writes_that_skip_pre_save_meet_the_database_instead(write: Callable[..., None]) -> None:
     endpoint = _endpoint()
     endpoint.save()
     endpoint.tenant = "t" * 300
-    with contextlib.suppress(DatabaseError), transaction.atomic():
-        Endpoint.objects.update(tenant="t" * 300)
-    with contextlib.suppress(DatabaseError), transaction.atomic():
-        Endpoint.objects.bulk_update([endpoint], ["tenant"])
+    if connection.vendor == "sqlite":
+        write(endpoint)
+        assert len(Endpoint.objects.get().tenant) == 300
+    else:
+        with pytest.raises(DataError), transaction.atomic():
+            write(endpoint)
+
+
+def test_bulk_update_skips_pre_save_and_postgres_truncates_through_its_cast() -> None:
+    endpoint = _endpoint()
+    endpoint.save()
+    endpoint.tenant = "t" * 300
+    _bulk_update(endpoint)
+    expected = 300 if connection.vendor == "sqlite" else _tenant_limit()
+    assert len(Endpoint.objects.get().tenant) == expected
+
+
+def test_a_stored_over_long_tenant_is_refused_by_update_or_create_that_leaves_it() -> None:
+    if connection.vendor != "sqlite":
+        pytest.skip("only SQLite can hold an over-long tenant")
+    _endpoint(name="Acme").save()
+    Endpoint.objects.update(tenant="t" * 300)
+    with pytest.raises(ValueTooLong):
+        Endpoint.objects.update_or_create(name="Acme", defaults={"format_version": 2})
+
+
+def test_a_caller_catching_the_error_keeps_its_transaction_with_its_own_atomic() -> None:
+    with transaction.atomic():
+        with contextlib.suppress(ValueTooLong), transaction.atomic():
+            Endpoint.objects.create(**_fields(tenant="t" * 300))
+        Endpoint.objects.create(**_fields(tenant="acme"))
+    assert list(Endpoint.objects.values_list("tenant", flat=True)) == ["acme"]
+
+
+def test_a_caller_catching_the_error_without_its_own_atomic_loses_the_transaction() -> None:
+    with transaction.atomic():
+        with contextlib.suppress(ValueTooLong):
+            Endpoint.objects.create(**_fields(tenant="t" * 300))
+        with pytest.raises(TransactionManagementError):
+            Endpoint.objects.create(**_fields(tenant="acme"))
