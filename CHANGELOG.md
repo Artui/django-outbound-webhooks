@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-14
+
+A minor release below 1.0 because the package root now serves the names that
+reach the models lazily, which moves when they can be imported (see Changed).
+The django-domain-events floor stays at 0.9.0: nothing here uses a newer API.
+
 ### Fixed
 - **An IPv6 address that embeds an IPv4 address is now judged by that IPv4 address too.** `check_address` read `2002:a9fe:a9fe::1`, a 6to4 address carrying the cloud metadata address 169.254.169.254, only as IPv6, where Python calls it private, so with `ALLOW_PRIVATE_ADDRESSES` on it was delivered to. The IPv4 address inside a 6to4, IPv4-mapped or Teredo (server and client) address now goes through the same rules and the destination is refused if either address is, with the reason reading, for example, `link-local (embedded 169.254.169.254)`. A destination embedding a private or loopback IPv4 address is still reachable with the flag on and refused with it off.
 - **`ALLOW_PRIVATE_ADDRESSES` no longer opens reserved address space.** The setting was documented as relaxing private and loopback addresses only, but `check_address` grouped reserved space with them, so with the flag on a destination such as `240.0.0.1` or `64:ff9b::a9fe:a9fe` (the NAT64 form of the cloud metadata address) was delivered to. Reserved space is now refused whatever the flag says. `::1` stays reachable with the flag on, as loopback, although Python also classes it as reserved. A development setup that delivered to an address in a reserved range will now see it refused.
@@ -374,7 +380,8 @@ shipped a package that posts to whatever URL a customer types.
   offset and every conforming receiver rejects it as too old or too new, which
   presents as a signature failure carrying a correct signature.
 
-[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.1.0...v0.2.0
