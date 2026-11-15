@@ -331,6 +331,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#where-deliveries-go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where deliveries go
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#body-formats" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -342,10 +353,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#signing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#operations" class="md-nav__link">
     <span class="md-ellipsis">
       
         Operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
       
     </span>
   </a>
@@ -409,6 +442,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#where-deliveries-go" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where deliveries go
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#body-formats" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -420,10 +464,32 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#signing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Signing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#operations" class="md-nav__link">
     <span class="md-ellipsis">
       
         Operations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
       
     </span>
   </a>
@@ -480,6 +546,48 @@ for that delivery - so every endpoint has its own attempts, backoff,
 dead-letter and replay. An event nobody subscribes to writes no row. The lookup
 is one indexed query on every event the project fires, and the receiver is
 matched at fire time, so the order of <code>INSTALLED_APPS</code> does not matter.</p>
+<p>With <code>TENANT_SCOPE_KEY</code> set, an event whose scope has no value under that key
+reaches no endpoint, and no delivery row is written for it, so a missing tenant
+fails closed rather than reaching every subscriber. In that deployment an
+endpoint without a tenant is refused at registration, for the same reason.
+Without the key, every active subscriber to the event is owed it.</p>
+<p>A tenant holds at most 255 characters, the indexed column's width. A longer one
+is refused before the write with <code>ValueTooLong</code>, which names the field and its
+limit, on every backend, through <code>save()</code>, <code>.create()</code>, <code>bulk_create</code>,
+<code>get_or_create</code> and <code>update_or_create</code>. Three writes skip the check: a queryset
+<code>.update()</code> and a fixture or other raw save meet the database's own limit, which
+SQLite does not enforce, and <code>bulk_update</code> on Postgres casts the value to the
+column type, which truncates it to 255 characters without an error. The error is
+raised inside Django's save, so a caller that catches it inside a transaction
+wraps that save in its own <code>atomic()</code> to keep the transaction usable. Before
+Django 6.0 the same holds for <code>bulk_create</code>, which prepares its rows inside an
+<code>atomic()</code> of its own; from 6.0 a refused <code>bulk_create</code> of new rows leaves the
+transaction usable.</p>
+<p>Within one delivery, a <code>408</code>, <code>429</code> or <code>5xx</code> answer is retried, and any other
+answer that is not a <code>2xx</code> ends that delivery's requests at once. The delivery
+itself is still retried on the substrate's schedule, so a <code>410</code> or a <code>400</code> uses
+the whole budget of five attempts before it is dead-lettered, and counts toward
+auto-disable like any other dead delivery.</p>
+<p>A request the address check refuses is not recorded as an attempt. Its delivery
+is retried on the substrate's schedule and dead-lettered like any other, and the
+reason is on the substrate's delivery record, not in the attempt log.</p>
+<h2 id="where-deliveries-go">Where deliveries go<a class="headerlink" href="#where-deliveries-go" title="Permanent link">&para;</a></h2>
+<p>Every request goes to an address the package has checked, and that check is the
+policy. The check runs when a request is sent, not when the endpoint is
+registered: registration only requires an <code>http</code> or <code>https</code> URL. A destination
+is refused if it resolves to link-local, multicast, unspecified, reserved or
+carrier-grade NAT space, and no setting changes that. Private and loopback space
+are refused too, unless <code>ALLOW_PRIVATE_ADDRESSES</code> is set, which is for
+development. An IPv6 address that embeds an IPv4 address (6to4, IPv4-mapped) is
+judged by that IPv4 address too, so <code>2002:a9fe:a9fe::1</code> is refused as the link-local
+metadata address it carries.</p>
+<p>A hostname is resolved once for each request, every address it returns is
+checked, and the connection is made to the address that was checked. A DNS
+answer that changes between the check and the connection therefore cannot move
+the request. A literal IP in the URL is checked without a lookup. Redirects are
+followed up to <code>MAX_REDIRECTS</code>, and each hop is checked the same way. A <code>307</code> or
+<code>308</code> redirect re-sends the signed body and the <code>webhook-</code> headers to its
+target, so a redirect is a second place the payload can go.</p>
 <h2 id="body-formats">Body formats<a class="headerlink" href="#body-formats" title="Permanent link">&para;</a></h2>
 <p>An endpoint is pinned to one published format <em>version</em> at registration, and a
 published version is frozen: changing what it renders would change what an
@@ -520,6 +628,22 @@ check says so when <code>DEFAULT_FORMAT</code> names it.</p>
 <code>Protocol</code> -- and the registry verifies at registration that it can actually
 render a delivery, because a format is published once at startup and called
 hours later in another process.</p>
+<p><code>render()</code> returns UTF-8 bytes, because the signature is computed over the body
+as text. The registry checks the method's keywords when a format is registered,
+but not the encoding: a body that is not UTF-8 is refused when a delivery is
+sent, and that delivery is retried like any other failure.</p>
+<h2 id="signing">Signing<a class="headerlink" href="#signing" title="Permanent link">&para;</a></h2>
+<p>Each request carries <code>webhook-id</code>, <code>webhook-timestamp</code> and <code>webhook-signature</code>,
+as the Standard Webhooks specification defines them, and the signature covers
+the body as text. The secret is the base64 string you registered, with or
+without its <code>whsec_</code> prefix. This package signs but does not verify: a customer
+verifies with a Standard Webhooks library, using that secret. During a rotation
+the header carries one signature per secret still in its overlap window, and a
+receiver accepts the request if any of them verifies.</p>
+<p>Every retry of a delivery sends the same body under the same <code>webhook-id</code>, so a
+receiver can deduplicate on that header. <code>webhook-timestamp</code> is taken fresh for
+each attempt, so a receiver should check it against its own tolerance window,
+not against the first attempt.</p>
 <h2 id="operations">Operations<a class="headerlink" href="#operations" title="Permanent link">&para;</a></h2>
 <p><code>replay_delivery(message_id=...)</code> fires a logged delivery again. It is a <strong>new</strong>
 delivery rather than a re-run: a new <code>webhook-id</code>, because a receiver
@@ -529,6 +653,9 @@ attempt budget, backoff and log rows, because it goes through the substrate like
 everything else. It refuses rather than firing something that cannot arrive - an
 unlogged message id, a deleted endpoint, an inactive one, or an event retention
 has already pruned.</p>
+<p><code>replay_delivery</code> returns once the new delivery is recorded, not once it is
+sent. The send happens later, when the substrate's relay claims the row. Its
+outcome is in the attempt log under the returned <code>webhook-id</code>.</p>
 <p><code>rotate_secret(endpoint, new_secret=...)</code> changes a secret without a coordinated
 cutover. Both secrets sign for <code>SECRET_ROTATION_OVERLAP_SECONDS</code>, and a receiver
 accepts the delivery if either signature verifies, so the customer deploys the
@@ -547,6 +674,18 @@ delivery that lands resets the count, which is what makes the threshold mean
 clears the count, which has to happen together: an endpoint re-enabled with its
 count still at the threshold is switched off again by its very next dead
 delivery.</p>
+<p>A delivery still queued when its endpoint is switched off or deleted is dropped
+when it next runs. Nothing is sent and no attempt row is written, so it does not
+appear in the log and cannot be replayed by its <code>webhook-id</code>.</p>
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
+<p>Each delivery has <code>DELIVERY_LEASE_SECONDS</code> to finish its requests. The package
+retries a failed request until the delivery has used the lease less
+<code>TIMEOUT_SECONDS</code> and <code>LEASE_MARGIN_SECONDS</code>, and no further request is started
+after that. Raise the lease or lower the timeout if a lease cannot hold one
+request and the margin: otherwise every delivery raises a <code>ValueError</code> when it is
+sent. The other keys are described where their behaviour is: <code>TENANT_SCOPE_KEY</code>
+under "How delivery works", <code>ALLOW_PRIVATE_ADDRESSES</code> and <code>MAX_REDIRECTS</code> under
+"Where deliveries go", and <code>LOG_BODY_CHARS</code> under "Admin".</p>
 <h2 id="admin">Admin<a class="headerlink" href="#admin" title="Permanent link">&para;</a></h2>
 <p>Install <code>django.contrib.admin</code> and both models appear. The registry page shows
 per-endpoint health in the unit that means something - "3 dead deliveries in a
@@ -554,6 +693,11 @@ row" rather than a bare number - and links each endpoint to its own attempts
 instead of counting them, because the next question is what the last one said.
 The log page is read-only and renders both attempt numbers as <code>3.2</code>, so which
 tier each counts stays legible.</p>
+<p>Each log row is one attempt at the endpoint's URL. It keeps that URL as it was
+then, query string included, a SHA-256 and the length of the request body, and
+the first <code>LOG_BODY_CHARS</code> of the response body or of the transport error. The
+body itself is not kept. Deleting an endpoint keeps its rows and clears only
+their link to it, so a row can name a URL the registry no longer holds.</p>
 <p>Two actions: <code>reactivate</code> on the registry, which clears the dead-delivery count
 along with the flag, and <code>replay</code> on the log, which sends <strong>once per delivery
 rather than once per row</strong> - a failed delivery is several rows, and replaying
