@@ -31,7 +31,10 @@ limit, on every backend, through `save()`, `.create()`, `bulk_create`,
 SQLite does not enforce, and `bulk_update` on Postgres casts the value to the
 column type, which truncates it to 255 characters without an error. The error is
 raised inside Django's save, so a caller that catches it inside a transaction
-wraps that save in its own `atomic()` to keep the transaction usable.
+wraps that save in its own `atomic()` to keep the transaction usable. Before
+Django 6.0 the same holds for `bulk_create`, which prepares its rows inside an
+`atomic()` of its own; from 6.0 a refused `bulk_create` of new rows leaves the
+transaction usable.
 
 Within one delivery, a `408`, `429` or `5xx` answer is retried, and any other
 answer that is not a `2xx` ends that delivery's requests at once. The delivery

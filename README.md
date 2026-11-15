@@ -47,7 +47,10 @@ limit, on every backend, through `save()`, `.create()`, `bulk_create`,
 SQLite does not enforce, and `bulk_update` on Postgres casts the value to the
 column type, which truncates it to 255 characters without an error. The error is
 raised inside Django's save, so a caller that catches it inside a transaction
-wraps that save in its own `atomic()` to keep the transaction usable.
+wraps that save in its own `atomic()` to keep the transaction usable. Before
+Django 6.0 the same holds for `bulk_create`, which prepares its rows inside an
+`atomic()` of its own; from 6.0 a refused `bulk_create` of new rows leaves the
+transaction usable.
 
 An endpoint answering `429` or `503` with `Retry-After` is taken at its word:
 that delivery stops retrying inside its lease and its next attempt is scheduled

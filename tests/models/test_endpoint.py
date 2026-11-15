@@ -4,6 +4,7 @@ import base64
 import contextlib
 from collections.abc import Callable
 
+import django
 import pytest
 from django.core import serializers
 from django.core.exceptions import ValidationError
@@ -97,7 +98,7 @@ def test_save_refuses_an_over_long_tenant_before_any_sql(django_assert_num_queri
 
 def test_bulk_create_refuses_an_over_long_tenant_before_any_sql(django_assert_num_queries) -> None:
     rows = [_endpoint(tenant="acme"), _endpoint(tenant="t" * (_tenant_limit() + 1))]
-    with django_assert_num_queries(0), pytest.raises(ValueTooLong):
+    with transaction.atomic(), django_assert_num_queries(0), pytest.raises(ValueTooLong):
         Endpoint.objects.bulk_create(rows)
     assert not Endpoint.objects.exists()
 
@@ -179,3 +180,14 @@ def test_a_caller_catching_the_error_without_its_own_atomic_loses_the_transactio
             Endpoint.objects.create(**_fields(tenant="t" * 300))
         with pytest.raises(TransactionManagementError):
             Endpoint.objects.create(**_fields(tenant="acme"))
+
+
+def test_a_caught_bulk_create_refusal_loses_the_transaction_only_before_django_6() -> None:
+    with transaction.atomic():
+        with contextlib.suppress(ValueTooLong):
+            Endpoint.objects.bulk_create([_endpoint(tenant="t" * 300)])
+        if django.VERSION < (6, 0):
+            with pytest.raises(TransactionManagementError):
+                Endpoint.objects.exists()
+        else:
+            assert not Endpoint.objects.exists()
