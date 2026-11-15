@@ -26,6 +26,7 @@ _LAZY_EXPORTS: dict[str, str] = {
     "replay_delivery": "django_outbound_webhooks.operations.replay_delivery",
     "rotate_secret": "django_outbound_webhooks.operations.rotate_secret",
     "signing_secrets": "django_outbound_webhooks.signing.signing_secrets",
+    "ValueTooLong": "django_outbound_webhooks.models.value_too_long",
 }
 
 # The two field validators are deliberately NOT re-exported, here or from their
@@ -58,6 +59,7 @@ __all__ = [
     "FormatRegistry",
     "RenderedBody",
     "ReplayRefused",
+    "ValueTooLong",
     "__version__",
     "endpoints_for",
     "formats",

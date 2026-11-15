@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-11-14
+
+A minor release below 1.0 because the package root now serves the names that
+reach the models lazily, which moves when they can be imported (see Changed).
+The django-domain-events floor stays at 0.9.0: nothing here uses a newer API.
+
 ### Fixed
 - **An IPv6 address that embeds an IPv4 address is now judged by that IPv4 address too.** `check_address` read `2002:a9fe:a9fe::1`, a 6to4 address carrying the cloud metadata address 169.254.169.254, only as IPv6, where Python calls it private, so with `ALLOW_PRIVATE_ADDRESSES` on it was delivered to. The IPv4 address inside a 6to4, IPv4-mapped or Teredo (server and client) address now goes through the same rules and the destination is refused if either address is, with the reason reading, for example, `link-local (embedded 169.254.169.254)`. A destination embedding a private or loopback IPv4 address is still reachable with the flag on and refused with it off.
 - **`ALLOW_PRIVATE_ADDRESSES` no longer opens reserved address space.** The setting was documented as relaxing private and loopback addresses only, but `check_address` grouped reserved space with them, so with the flag on a destination such as `240.0.0.1` or `64:ff9b::a9fe:a9fe` (the NAT64 form of the cloud metadata address) was delivered to. Reserved space is now refused whatever the flag says. `::1` stays reachable with the flag on, as loopback, although Python also classes it as reserved. A development setup that delivered to an address in a reserved range will now see it refused.
 - **`DEFAULT_FORMAT` naming nothing is now reported by `manage.py check`.** `check_default_format_is_published` (`django_outbound_webhooks.W002`) was registered by a decorator in `checks.py`, which no code path in a running project imports, so in a deployment the check never ran and a bad default surfaced only when the first endpoint was registered. `WebhooksConfig.ready` now registers it. A project whose `DEFAULT_FORMAT` names a family nothing publishes will see the warning on its next `check` or `migrate`; it is a warning, so nothing stops.
+- **An over-long `Endpoint.tenant` is refused before the write, on every backend.** The column is indexed and keeps its 255-character cap, but only `full_clean` checked it, and `full_clean` does not run on `Endpoint.objects.create()`, `save()` or `bulk_create`: on Postgres such a write reached the database and failed with a `DataError` that named no field, and SQLite stored the value. The field now refuses a longer value when the row is saved, before any SQL, with the new `ValueTooLong` (a `ValueError`, exported from the package root), whose message and `field` and `limit` attributes name the field and the limit read from the model. A caller on Postgres that caught `DataError` for this now gets `ValueTooLong` instead. `register_endpoint` is unchanged: it already refused through `full_clean` with a `ValidationError`. A queryset `.update()`, `bulk_update` and a raw save (`loaddata`, a deserialized object's `save()`) do not run the check; `bulk_update` on Postgres truncates an over-long tenant to 255 characters without an error, as before. Because the field now prepares its value on save, `update_or_create` writes `tenant` on every call, so a row that already holds an over-long tenant (possible on SQLite only) is refused on its next full `save()` or `update_or_create`. A caller that catches `ValueTooLong` inside `transaction.atomic()` wraps the save in its own `atomic()`, or the outer transaction can no longer be used; before Django 6.0 this applies to `bulk_create` too, which prepares its rows inside an `atomic()` of its own. The field is recorded in migrations as a plain `CharField`, so there is no new migration.
 
 ### Changed
 - **The guide says what the package refuses and what a receiver sees.** The README and the docs home page gain "Where deliveries go" (the request-forgery policy), "Signing" and "Settings", and describe a tenantless event, retries after a permanent-looking answer, what the log keeps, and what a replay or a dropped delivery leaves behind. The `PERMANENT` verdict's docstring now says it ends only the requests within one delivery.
@@ -373,7 +380,8 @@ shipped a package that posts to whatever URL a customer types.
   offset and every conforming receiver rejects it as too old or too new, which
   presents as a signature failure carrying a correct signature.
 
-[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Artui/django-outbound-webhooks/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Artui/django-outbound-webhooks/compare/v0.1.0...v0.2.0

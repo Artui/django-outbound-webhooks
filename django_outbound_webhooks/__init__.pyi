@@ -20,6 +20,7 @@ from django_outbound_webhooks.formats.cloud_events_v1 import CloudEventsV1 as Cl
 from django_outbound_webhooks.formats.envelope_v1 import EnvelopeV1 as EnvelopeV1
 from django_outbound_webhooks.formats.format_registry import FormatRegistry as FormatRegistry
 from django_outbound_webhooks.formats.format_registry import formats as formats
+from django_outbound_webhooks.models.value_too_long import ValueTooLong as ValueTooLong
 from django_outbound_webhooks.operations.reactivate_endpoint import (
     reactivate_endpoint as reactivate_endpoint,
 )
@@ -40,6 +41,7 @@ __all__ = [
     "FormatRegistry",
     "RenderedBody",
     "ReplayRefused",
+    "ValueTooLong",
     "__version__",
     "endpoints_for",
     "formats",

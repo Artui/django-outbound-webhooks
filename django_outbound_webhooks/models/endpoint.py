@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.db import models
 
 from django_outbound_webhooks.endpoints.validate_webhook_url import validate_webhook_url
+from django_outbound_webhooks.models.length_checked_char_field import LengthCheckedCharField
 from django_outbound_webhooks.signing.validate_signing_secret import validate_signing_secret
 
 
@@ -23,7 +24,7 @@ class Endpoint(models.Model):
     format_name = models.CharField(max_length=100)
     format_version = models.PositiveSmallIntegerField()
 
-    tenant = models.CharField(max_length=255, blank=True, db_index=True)
+    tenant = LengthCheckedCharField(max_length=255, blank=True, db_index=True)
 
     previous_secret = models.CharField(max_length=255, blank=True)
     previous_secret_expires_at = models.DateTimeField(null=True, blank=True)
